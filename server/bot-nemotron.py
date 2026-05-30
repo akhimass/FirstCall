@@ -961,7 +961,13 @@ async def run_bot(
         logger.info("Client connected")
         # Brief pause to let Krisp VIVA warm up and Twilio connection noise settle
         # before the greeting LLM runs, preventing spurious VAD interruptions.
-        await asyncio.sleep(1.0)
+        # WebRTC (Cekura sims) needs extra time for cold pods + Daily room setup.
+        if from_number is None:
+            delay = float(os.getenv("WEBRTC_GREETING_DELAY_SECS", "3.0"))
+            logger.info("[GREETING] WebRTC path — waiting {:.1f}s before opening", delay)
+        else:
+            delay = float(os.getenv("GREETING_DELAY_SECS", "1.0"))
+        await asyncio.sleep(delay)
         context.add_message(
             {
                 "role": "user",
