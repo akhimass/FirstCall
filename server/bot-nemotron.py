@@ -18,6 +18,7 @@ Run the bot using::
     uv run bot-nemotron.py
 """
 
+import asyncio
 import os
 import random
 from datetime import date
@@ -354,6 +355,7 @@ async def run_bot(
     stt = NVidiaWebSocketSTTService(
         url=os.getenv("NVIDIA_ASR_URL", "ws://192.168.7.228:8081"),
         strip_interim_prefix=True,
+        preroll_seconds=0.2,
     )
 
     # LLM service — Nemotron-3-Super-120B served by vLLM (OpenAI-compatible chat
@@ -405,7 +407,7 @@ async def run_bot(
     user_aggregator, assistant_aggregator = LLMContextAggregatorPair(
         context,
         user_params=LLMUserAggregatorParams(
-            vad_analyzer=SileroVADAnalyzer(),
+            vad_analyzer=SileroVADAnalyzer(sample_rate=audio_in_sample_rate),
             user_turn_strategies=FilterIncompleteUserTurnStrategies(),
         ),
     )
@@ -430,13 +432,16 @@ async def run_bot(
             enable_usage_metrics=True,
             audio_in_sample_rate=audio_in_sample_rate,
             audio_out_sample_rate=audio_out_sample_rate,
+            allow_interruptions=False,
         ),
     )
 
     @transport.event_handler("on_client_connected")
     async def on_client_connected(transport, client):
         logger.info("Client connected")
-        # Kick off the conversation
+        # Brief pause to let Krisp VIVA warm up and Twilio connection noise settle
+        # before the greeting LLM runs, preventing spurious VAD interruptions.
+        await asyncio.sleep(1.0)
         context.add_message(
             {
                 "role": "user",
