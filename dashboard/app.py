@@ -1,4 +1,4 @@
-"""Morrison & Associates — AI Intake Performance Dashboard (xAI DESIGN.md)."""
+"""LexIntake — AI Intake console (Cekura × Agiloft styled, light theme)."""
 
 from __future__ import annotations
 
@@ -6,979 +6,942 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from data import (
+    AGENT_NAME,
+    AGENT_PROVIDER,
+    AGENT_VERSION,
     AVG_CASE_VALUE,
     FIRM_NAME,
     FIRM_TAGLINE,
+    call_kpis,
     estimated_pipeline,
     format_currency,
     get_call_heatmap,
+    get_calls,
     get_decline_reasons,
     get_funnel,
     get_today,
     get_week,
 )
 
-# ── xAI DESIGN.md tokens ─────────────────────────────────────────────────────
-PRIMARY = "#ffffff"
-ON_PRIMARY = "#0a0a0a"
-INK = "#ffffff"
-BODY = "#dadbdf"
-MUTE = "#7d8187"
-HAIRLINE = "#212327"
-CANVAS = "#0a0a0a"
-CANVAS_SOFT = "#1a1c20"
-CANVAS_CARD = "#191919"
-CANVAS_MID = "#363a3f"
-ACCENT = "#8a8278"
-ACCENT_WARM = "#9a8f82"
-ACCENT_COOL = "#6e7680"
-ACCENT_MUTED = "#5c636a"
+try:
+    from mock_data import (
+        EVALUATORS,
+        PERSONAS,
+        SCORES_V1,
+        SCORES_V2,
+        SCORES_V3,
+        VERSION_NOTES,
+        VERSION_SCORES,
+    )
+    HAS_SIM = True
+except Exception:  # pragma: no cover
+    HAS_SIM = False
 
-FONT = "Inter, system-ui, -apple-system, sans-serif"
-FONT_MONO = "JetBrains Mono, ui-monospace, SFMono-Regular, Menlo, monospace"
+# ── shadcn/ui design tokens (neutral base · light) ───────────────────────────
+INK = "#0a0a0a"          # foreground (neutral-950)
+BODY = "#404040"         # body text (neutral-700)
+MUTE = "#737373"         # muted-foreground (neutral-500)
+FAINT = "#a3a3a3"        # neutral-400
+HAIRLINE = "#e5e5e5"     # border (neutral-200)
+HAIRLINE_SOFT = "#f5f5f5"  # neutral-100
+CANVAS = "#ffffff"       # background / card
+CANVAS_SOFT = "#fafafa"  # neutral-50 (muted surfaces)
+SIDEBAR_BG = "#fafafa"
+ACCENT = "#171717"       # primary (neutral-900)
+ACCENT_SOFT = "#f5f5f5"  # secondary
+ACCENT_TEXT = "#171717"  # secondary-foreground
+RING = "#a3a3a3"
 
-PLOT_CONFIG = {"displayModeBar": False, "staticPlot": False}
+# Semantic badge tones (kept for disposition legibility)
+GREEN_BG, GREEN_TX = "#dcfce7", "#15803d"
+RED_BG, RED_TX = "#fee2e2", "#b91c1c"
+AMBER_BG, AMBER_TX = "#fef3c7", "#b45309"
+BLUE_BG, BLUE_TX = "#e0eaff", "#1d4ed8"
 
-# Chart data labels — match donut center "67" style
-CHART_NUM_SIZE = 28
-CHART_NUM_FONT = dict(size=CHART_NUM_SIZE, color=INK, family=FONT)
-CHART_AXIS_FONT = dict(color=MUTE, family=FONT_MONO, size=10)
+# Monochrome chart ramp (dark → light), the shadcn way
+RAMP = ["#171717", "#404040", "#525252", "#737373", "#a3a3a3", "#d4d4d4"]
+
+FONT = "'Geist', 'Inter', system-ui, -apple-system, sans-serif"
+FONT_MONO = "'Geist Mono', ui-monospace, SFMono-Regular, Menlo, monospace"
+
+PLOT_CONFIG = {"displayModeBar": False}
 
 st.set_page_config(
-    page_title=f"{FIRM_NAME} · Intake Analytics",
+    page_title=f"{AGENT_NAME} · Intake Console",
     page_icon="⚖️",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
+PAGE = st.query_params.get("page", "calls")
+FILTER = st.query_params.get("f", "all")
+
+# ── Icons (Lucide-style strokes) ─────────────────────────────────────────────
+def _icon(paths: str) -> str:
+    return (
+        f'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        f'stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" '
+        f'width="18" height="18">{paths}</svg>'
+    )
+
+
+ICONS = {
+    "home": _icon('<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>'),
+    "agent": _icon('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20l3-4M17 20l-3-4"/><circle cx="9" cy="10" r="1"/><circle cx="15" cy="10" r="1"/>'),
+    "metrics": _icon('<path d="M21 12a9 9 0 1 1-9-9v9z"/><path d="M12 3a9 9 0 0 1 9 9h-9z"/>'),
+    "labs": _icon('<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/><path d="M7 16h10"/>'),
+    "personality": _icon('<circle cx="12" cy="8" r="4"/><path d="M5 21a7 7 0 0 1 14 0"/>'),
+    "evaluator": _icon('<path d="M3 5a2 2 0 0 1 2-2h6v18H5a2 2 0 0 1-2-2z"/><path d="M21 5a2 2 0 0 0-2-2h-6v18h6a2 2 0 0 0 2-2z"/>'),
+    "results": _icon('<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>'),
+    "runs": _icon('<path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 5-6"/>'),
+    "calls": _icon('<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3-8.6A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.6a16 16 0 0 0 6 6l1.1-1.1a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/>'),
+    "overview": _icon('<path d="M3 3v18h18"/><rect x="7" y="11" width="3" height="7"/><rect x="12" y="7" width="3" height="11"/><rect x="17" y="13" width="3" height="5"/>'),
+    "search": _icon('<circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/>'),
+    "copy": _icon('<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>'),
+    "flask": _icon('<path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 2 3h10a2 2 0 0 0 2-3l-5-9V3"/>'),
+    "trash": _icon('<path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'),
+    "globe": _icon('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18 14 14 0 0 1 0-18z"/>'),
+    "dots": _icon('<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>'),
+}
+
+# ── Navigation model ─────────────────────────────────────────────────────────
+NAV = [
+    ("AGENTS", [("home", "Home"), ("agent", "Agent Settings")]),
+    ("METRICS", [("metrics", "Metrics"), ("labs", "Labs")]),
+    ("SIMULATION", [("personality", "Personality"), ("evaluator", "Evaluator"),
+                    ("results", "Results"), ("runs", "Runs Overview")]),
+    ("OBSERVABILITY", [("calls", "Calls"), ("overview", "Overview")]),
+]
+
+PAGE_META = {
+    "home": ("Home", "Operational snapshot for your intake agent"),
+    "agent": ("Agent Settings", "Voice, model, and qualification configuration"),
+    "metrics": ("Metrics", "Quality, latency, and accuracy over time"),
+    "labs": ("Labs", "Saved calls staged for replay and regression"),
+    "personality": ("Personality", "Caller personas used in simulation"),
+    "evaluator": ("Evaluator", "Pass / fail criteria graded on every call"),
+    "results": ("Results", "Simulation scores across prompt versions"),
+    "runs": ("Runs Overview", "History of simulation runs"),
+    "calls": ("Calls", "Every intake call captured by the agent"),
+    "overview": ("Overview", "Pipeline, funnel, and after-hours capture"),
+}
+
+# ── Global CSS ───────────────────────────────────────────────────────────────
 st.markdown(
     f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400&family=JetBrains+Mono:wght@400&display=swap');
-
-:root {{
-  --canvas: {CANVAS};
-  --card: {CANVAS_CARD};
-  --hairline: {HAIRLINE};
-  --ink: {INK};
-  --body: {BODY};
-  --mute: {MUTE};
-}}
-
-header[data-testid="stHeader"],
-[data-testid="stToolbar"],
-[data-testid="stDecoration"],
-#MainMenu,
-footer {{
-  display: none !important;
-  height: 0 !important;
-  min-height: 0 !important;
-  visibility: hidden !important;
-}}
-
-.stApp {{
-  background: {CANVAS};
-  color: {INK};
-  font-family: {FONT};
-  -webkit-font-smoothing: antialiased;
-  position: relative;
-}}
-
-.stApp::before {{
-  content: "";
-  position: fixed;
-  inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-  background-size: 28px 28px;
-  pointer-events: none;
-  z-index: 0;
-}}
-
-.stApp > [data-testid="stAppViewContainer"] {{
-  position: relative;
-  z-index: 1;
-}}
-
-@media (prefers-reduced-motion: reduce) {{
-  *, *::before, *::after {{
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }}
-}}
-
-@keyframes fadeSlideDown {{
-  from {{ opacity: 0; transform: translateY(-12px); }}
-  to {{ opacity: 1; transform: translateY(0); }}
-}}
-
-@keyframes fadeSlideUp {{
-  from {{ opacity: 0; transform: translateY(20px); }}
-  to {{ opacity: 1; transform: translateY(0); }}
-}}
-
-@keyframes fadeIn {{
-  from {{ opacity: 0; }}
-  to {{ opacity: 1; }}
-}}
-
-@keyframes scaleIn {{
-  from {{ opacity: 0; transform: scale(0.96); }}
-  to {{ opacity: 1; transform: scale(1); }}
-}}
-
-@keyframes pulseDot {{
-  0%, 100% {{ opacity: 1; transform: scale(1); }}
-  50% {{ opacity: 0.45; transform: scale(0.85); }}
-}}
-
-@keyframes shimmerLine {{
-  from {{ transform: scaleX(0); }}
-  to {{ transform: scaleX(1); }}
-}}
-
-@keyframes countGlow {{
-  0%, 100% {{ opacity: 0.85; }}
-  50% {{ opacity: 1; }}
-}}
-
-.animate-nav {{
-  animation: fadeSlideDown 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-}}
-
-.animate-hero {{
-  animation: fadeSlideUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
-}}
-
-.animate-block {{
-  animation: fadeSlideUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
-}}
-
-.animate-card {{
-  animation: scaleIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
-}}
-
-.animate-chart {{
-  animation: fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
-}}
-
-.delay-1 {{ animation-delay: 0.06s; }}
-.delay-2 {{ animation-delay: 0.12s; }}
-.delay-3 {{ animation-delay: 0.18s; }}
-.delay-4 {{ animation-delay: 0.24s; }}
-.delay-5 {{ animation-delay: 0.30s; }}
-.delay-6 {{ animation-delay: 0.36s; }}
-.delay-7 {{ animation-delay: 0.42s; }}
-.delay-8 {{ animation-delay: 0.48s; }}
-.delay-9 {{ animation-delay: 0.54s; }}
-.delay-10 {{ animation-delay: 0.60s; }}
-
-[data-testid="stAppViewContainer"] {{
-  padding-top: 0 !important;
-  top: 0 !important;
-}}
-
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] > section.main,
-[data-testid="stAppViewContainer"] > section.main > div,
-.stMainBlockContainer,
-[data-testid="stAppViewBlockContainer"] {{
-  padding-top: 0 !important;
-  margin-top: 0 !important;
-}}
-
-.block-container {{
-  padding: 0 !important;
-  padding-top: 0 !important;
-  max-width: 100% !important;
-}}
-
-[data-testid="stVerticalBlock"] {{
-  gap: 0 !important;
-}}
-
-[data-testid="stVerticalBlock"] > div {{
-  margin-bottom: 0 !important;
-}}
-
-.stMarkdown {{
-  margin-bottom: 0 !important;
-}}
-
-div[data-testid="column"] {{
-  padding-top: 0 !important;
-}}
-
-[data-testid="stPlotlyChart"] {{
-  background: transparent;
-  animation: fadeIn 0.5s ease 0.2s both;
-}}
-
-iframe {{
-  border: none;
-}}
-
-/* nav */
-.nav {{
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 32px;
-  background: rgba(10, 10, 10, 0.88);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
-  border-bottom: 1px solid {HAIRLINE};
-  transition: border-color 0.3s ease, background 0.3s ease;
-}}
-
-.nav-brand {{
-  font-size: 14px;
-  letter-spacing: -0.02em;
-  color: {INK};
-  transition: opacity 0.2s ease;
-}}
-
-.nav-brand:hover {{
-  opacity: 0.8;
-}}
-
-.nav-links {{
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}}
-
-.pill {{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  font-size: 14px;
-  line-height: 20px;
-  padding: 8px 16px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: transparent;
-  color: {INK};
-  text-decoration: none;
-  white-space: nowrap;
-  transition: border-color 0.25s ease, background 0.25s ease, transform 0.2s ease, box-shadow 0.25s ease;
-  cursor: default;
-}}
-
-.pill:hover {{
-  border-color: rgba(255, 255, 255, 0.32);
-  background: rgba(255, 255, 255, 0.04);
-  transform: translateY(-1px);
-}}
-
-.pill:active {{
-  transform: translateY(0) scale(0.98);
-}}
-
-.pill-filled {{
-  background: {CANVAS_SOFT};
-  color: {BODY};
-  border-color: {ACCENT_MUTED};
-}}
-
-.pill-filled:hover {{
-  background: #222428;
-  border-color: rgba(154, 143, 130, 0.55);
-  box-shadow: 0 0 0 1px rgba(154, 143, 130, 0.12);
-}}
-
-.pill-live {{
-  border-color: rgba(154, 143, 130, 0.45);
-}}
-
-.status-dot {{
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: #6b9e7a;
-  box-shadow: 0 0 8px rgba(107, 158, 122, 0.55);
-  animation: pulseDot 2s ease-in-out infinite;
-  flex-shrink: 0;
-}}
-
-.pill-sm {{
-  padding: 4px 12px;
-  font-size: 12px;
-}}
-
-/* hero */
-.hero {{
-  padding: 32px 32px 48px;
-  max-width: 1200px;
-  margin: 0 auto;
-}}
-
-.eyebrow {{
-  font-family: {FONT_MONO};
-  font-size: 12px;
-  letter-spacing: 1.2px;
-  text-transform: uppercase;
-  color: {MUTE};
-  margin-bottom: 16px;
-}}
-
-.hero .eyebrow,
-.hero .hero-lead {{
-  animation: fadeSlideUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
-}}
-
-.hero h1 {{
-  font-size: clamp(40px, 6vw, 72px);
-  font-weight: 400;
-  line-height: 1.05;
-  letter-spacing: -0.025em;
-  margin: 0 0 20px;
-  max-width: 900px;
-}}
-
-.hero-line {{
-  display: inline-block;
-  animation: fadeSlideUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-}}
-
-.hero-line-2 {{
-  animation-delay: 0.1s;
-}}
-
-.hero-lead {{
-  font-size: 18px;
-  line-height: 28px;
-  color: {BODY};
-  max-width: 560px;
-  margin-bottom: 28px;
-}}
-
-/* after-hours band */
-.after-hours {{
-  max-width: 1200px;
-  margin: 0 auto 48px;
-  padding: 0 32px;
-}}
-
-.after-hours-inner {{
-  background: {CANVAS_CARD};
-  border: 1px solid {HAIRLINE};
-  border-radius: 10px;
-  padding: 32px;
-  position: relative;
-  overflow: hidden;
-  transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease;
-}}
-
-.after-hours-inner:hover {{
-  border-color: rgba(255, 255, 255, 0.22);
-  transform: translateY(-2px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
-}}
-
-.after-hours-inner::after {{
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: {ACCENT_WARM};
-  transform-origin: left;
-  animation: shimmerLine 0.8s cubic-bezier(0.22, 1, 0.36, 1) 0.3s both;
-  opacity: 0.6;
-}}
-
-.after-hours h2 {{
-  font-size: 32px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  line-height: 1.125;
-  margin: 0 0 8px;
-}}
-
-.after-hours .sub {{
-  font-size: 16px;
-  line-height: 24px;
-  color: {BODY};
-  margin-bottom: 28px;
-  max-width: 480px;
-}}
-
-.stat-row {{
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}}
-
-@media (max-width: 768px) {{
-  .stat-row {{ grid-template-columns: 1fr; }}
-}}
-
-.stat-block {{
-  padding: 20px;
-  background: {CANVAS_SOFT};
-  border: 1px solid {HAIRLINE};
-  border-radius: 10px;
-  transition: border-color 0.25s ease, transform 0.25s ease, background 0.25s ease;
-}}
-
-.stat-block:hover {{
-  border-color: rgba(255, 255, 255, 0.28);
-  background: #1e2024;
-  transform: translateY(-3px);
-}}
-
-.stat-block .val {{
-  font-size: 48px;
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  color: {BODY};
-  transition: color 0.25s ease;
-}}
-
-.stat-block:hover .val {{
-  color: {INK};
-  animation: countGlow 2s ease-in-out infinite;
-}}
-
-.stat-block .lbl {{
-  font-family: {FONT_MONO};
-  font-size: 11px;
-  letter-spacing: 1.1px;
-  text-transform: uppercase;
-  color: {MUTE};
-  margin-top: 8px;
-}}
-
-/* sections */
-.section {{
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 32px 48px;
-}}
-
-.section-head {{
-  margin-bottom: 24px;
-}}
-
-.section-head h2 {{
-  font-size: 32px;
-  font-weight: 400;
-  letter-spacing: -0.02em;
-  margin: 8px 0 0;
-  animation: fadeSlideUp 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.15s both;
-}}
-
-/* kpi grid */
-.kpi-grid {{
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-}}
-
-@media (max-width: 1100px) {{
-  .kpi-grid {{ grid-template-columns: repeat(3, 1fr); }}
-}}
-
-@media (max-width: 640px) {{
-  .kpi-grid {{ grid-template-columns: 1fr 1fr; }}
-  .kpi-featured {{ grid-column: 1 / -1; }}
-}}
-
-.kpi-card {{
-  background: {CANVAS_CARD};
-  border: 1px solid {HAIRLINE};
-  border-radius: 10px;
-  padding: 24px;
-  height: 100%;
-  transition: border-color 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease, background 0.3s ease;
-}}
-
-.kpi-card:hover {{
-  border-color: rgba(255, 255, 255, 0.32);
-  transform: translateY(-4px);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
-  background: #1c1c1c;
-}}
-
-.kpi-card .value {{
-  font-size: 40px;
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  color: {INK};
-  font-variant-numeric: tabular-nums;
-  transition: color 0.25s ease, transform 0.25s ease;
-}}
-
-.kpi-card:hover .value {{
-  transform: scale(1.02);
-  transform-origin: left center;
-}}
-
-.kpi-card .label {{
-  font-family: {FONT_MONO};
-  font-size: 11px;
-  letter-spacing: 1.1px;
-  text-transform: uppercase;
-  color: {MUTE};
-  margin-bottom: 12px;
-}}
-
-.kpi-card .value.accent {{
-  color: {ACCENT_WARM};
-}}
-
-.kpi-card:hover .value.accent {{
-  color: #b5a899;
-}}
-
-.kpi-card .sub {{
-  font-size: 14px;
-  line-height: 20px;
-  color: {MUTE};
-  margin-top: 10px;
-}}
-
-.kpi-featured {{
-  background: {CANVAS_SOFT};
-  border-color: {ACCENT_MUTED};
-  position: relative;
-}}
-
-.kpi-featured::before {{
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 16px;
-  bottom: 16px;
-  width: 2px;
-  background: {ACCENT_WARM};
-  border-radius: 2px;
-  opacity: 0.7;
-}}
-
-.kpi-featured:hover {{
-  border-color: rgba(154, 143, 130, 0.5);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.04);
-}}
-
-.kpi-featured .label {{
-  color: {MUTE};
-}}
-
-.kpi-featured .value {{
-  color: {INK};
-}}
-
-.kpi-featured .sub {{
-  color: {MUTE};
-}}
-
-/* chart cards */
-.chart-wrap {{
-  background: {CANVAS_CARD};
-  border: 1px solid {HAIRLINE};
-  border-radius: 10px;
-  padding: 24px;
-  height: 100%;
-  transition: border-color 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.3s ease;
-}}
-
-.chart-wrap:hover {{
-  border-color: rgba(255, 255, 255, 0.24);
-  transform: translateY(-2px);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.32);
-}}
-
-.chart-wrap h3 {{
-  font-size: 20px;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-  margin: 0 0 4px;
-  transition: color 0.2s ease;
-}}
-
-.chart-wrap:hover h3 {{
-  color: {BODY};
-}}
-
-.chart-wrap .caption {{
-  font-size: 14px;
-  color: {MUTE};
-  margin-bottom: 8px;
-}}
-
-.divider {{
-  height: 1px;
-  background: {HAIRLINE};
-  max-width: 1200px;
-  margin: 0 auto 48px;
-  transform-origin: left;
-  animation: shimmerLine 0.9s cubic-bezier(0.22, 1, 0.36, 1) 0.5s both;
-}}
-
-.footer {{
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 48px 32px 64px;
-  border-top: 1px solid {HAIRLINE};
-  animation: fadeIn 0.6s ease 0.7s both;
-}}
-
-.footer p {{
-  font-size: 14px;
-  color: {MUTE};
-  margin: 0;
-  line-height: 20px;
-}}
-
-.footer .mono {{
-  font-family: {FONT_MONO};
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}}
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
+header[data-testid="stHeader"], [data-testid="stToolbar"],
+[data-testid="stDecoration"], #MainMenu, footer {{ display:none !important; height:0 !important; }}
+
+.stApp {{ background:{CANVAS}; color:{INK}; font-family:{FONT};
+  font-feature-settings:"cv11","ss01"; -webkit-font-smoothing:antialiased; letter-spacing:-0.011em; }}
+h1, h2, h3, .topbar h1, .panel h3, .sectitle {{ letter-spacing:-0.025em; }}
+
+.block-container {{ padding:0 !important; max-width:100% !important; }}
+[data-testid="stVerticalBlock"] {{ gap:0 !important; }}
+[data-testid="stMain"] {{ background:{CANVAS}; }}
+[data-testid="stMainBlockContainer"] {{ padding:0 !important; }}
+
+/* ── Sidebar ── */
+[data-testid="stSidebar"] {{ background:{SIDEBAR_BG}; border-right:1px solid {HAIRLINE}; }}
+[data-testid="stSidebar"] > div {{ padding:0 !important; }}
+[data-testid="stSidebarContent"] {{ padding:0 !important; }}
+[data-testid="stSidebarHeader"], [data-testid="stSidebarCollapseButton"] {{ display:none !important; }}
+[data-testid="stSidebarUserContent"] {{ padding:0 !important; }}
+
+.sb-brand {{
+  display:flex; align-items:center; gap:10px;
+  padding:20px 18px 18px; border-bottom:1px solid {HAIRLINE};
+}}
+.sb-logo {{
+  width:30px; height:30px; border-radius:8px; flex-shrink:0;
+  background:{ACCENT}; color:#fff; display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:14px; letter-spacing:-0.02em;
+  box-shadow:0 1px 2px rgba(10,10,10,0.25);
+}}
+.sb-brand .nm {{ font-size:15px; font-weight:600; letter-spacing:-0.01em; color:{INK}; line-height:1.1; }}
+.sb-brand .sub {{ font-size:11px; color:{MUTE}; margin-top:2px; }}
+
+.sb-nav {{ padding:14px 12px 24px; }}
+.sb-group {{ font-size:10.5px; font-weight:600; letter-spacing:1px; color:{FAINT};
+  text-transform:uppercase; padding:14px 10px 7px; }}
+.sb-item {{
+  display:flex; align-items:center; gap:11px;
+  padding:8px 10px; margin:1px 0; border-radius:8px;
+  font-size:14px; font-weight:500; color:{BODY};
+  text-decoration:none; transition:background .15s ease, color .15s ease;
+}}
+.sb-item svg {{ color:{FAINT}; transition:color .15s ease; }}
+.sb-item:hover {{ background:#f1f2f4; color:{INK}; }}
+.sb-item:hover svg {{ color:{MUTE}; }}
+.sb-item.active {{ background:#eceef1; color:{INK}; font-weight:600; }}
+.sb-item.active svg {{ color:{ACCENT}; }}
+
+/* ── Topbar ── */
+.topbar {{
+  position:sticky; top:0; z-index:50;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 28px; background:rgba(255,255,255,0.9);
+  backdrop-filter:blur(8px); border-bottom:1px solid {HAIRLINE};
+}}
+.topbar h1 {{ font-size:20px; font-weight:600; letter-spacing:-0.02em; margin:0; color:{INK}; }}
+.topbar .crumb {{ font-size:12.5px; color:{MUTE}; margin-top:3px; }}
+.tb-right {{ display:flex; align-items:center; gap:10px; }}
+.searchbox {{
+  display:flex; align-items:center; gap:8px;
+  background:{CANVAS_SOFT}; border:1px solid {HAIRLINE}; border-radius:9px;
+  padding:7px 12px; font-size:13px; color:{FAINT}; min-width:220px;
+}}
+.searchbox svg {{ color:{FAINT}; }}
+.live {{
+  display:inline-flex; align-items:center; gap:7px;
+  background:{GREEN_BG}; color:{GREEN_TX};
+  font-size:12px; font-weight:600; padding:6px 12px; border-radius:9999px;
+}}
+.live .dot {{ width:7px; height:7px; border-radius:50%; background:{GREEN_TX}; }}
+.vbadge {{
+  font-size:12px; font-weight:600; color:{ACCENT_TEXT};
+  background:{ACCENT_SOFT}; border:1px solid {HAIRLINE}; padding:6px 11px; border-radius:8px;
+}}
+.avatar {{
+  width:32px; height:32px; border-radius:50%; background:{INK}; color:#fff;
+  display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:600;
+}}
+
+.page {{ padding:24px 28px 60px; max-width:1320px; }}
+
+/* ── KPI cards ── */
+.kpis {{ display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:22px; }}
+@media (max-width:1100px){{ .kpis {{ grid-template-columns:repeat(2,1fr); }} }}
+.kpi {{ background:{CANVAS}; border:1px solid {HAIRLINE}; border-radius:12px; padding:16px 18px; }}
+.kpi .lbl {{ font-size:11.5px; font-weight:600; letter-spacing:.4px; text-transform:uppercase; color:{MUTE}; }}
+.kpi .val {{ font-size:30px; font-weight:700; letter-spacing:-0.03em; color:{INK}; margin-top:8px; line-height:1; }}
+.kpi .val.accent {{ color:{ACCENT}; }}
+.kpi .delta {{ font-size:12.5px; margin-top:8px; color:{MUTE}; }}
+.kpi .delta.up {{ color:{GREEN_TX}; }}
+
+/* ── Toolbar / filter pills ── */
+.toolbar {{ display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap; }}
+.segs {{ display:inline-flex; background:{CANVAS_SOFT}; border:1px solid {HAIRLINE}; border-radius:10px; padding:3px; gap:2px; }}
+.seg {{ font-size:13px; font-weight:500; color:{MUTE}; text-decoration:none; padding:6px 14px; border-radius:8px; transition:all .15s ease; }}
+.seg:hover {{ color:{INK}; }}
+.seg.active {{ background:{CANVAS}; color:{INK}; font-weight:600; box-shadow:0 1px 2px rgba(15,23,42,0.08); }}
+.tb-actions {{ display:flex; gap:8px; }}
+.btn {{ font-size:13px; font-weight:500; color:{BODY}; background:{CANVAS}; border:1px solid {HAIRLINE};
+  border-radius:9px; padding:7px 13px; cursor:default; }}
+.btn.primary {{ background:{ACCENT}; color:#fff; border-color:{ACCENT}; }}
+
+/* ── Data table ── */
+.tbl-wrap {{ border:1px solid {HAIRLINE}; border-radius:13px; overflow:visible; background:{CANVAS}; }}
+table.dt {{ width:100%; border-collapse:collapse; font-size:13.5px; }}
+table.dt thead th {{
+  text-align:left; font-size:11.5px; font-weight:600; letter-spacing:.4px; text-transform:uppercase;
+  color:{MUTE}; background:{CANVAS_SOFT}; padding:12px 14px; border-bottom:1px solid {HAIRLINE};
+  white-space:nowrap;
+}}
+table.dt tbody td {{ padding:13px 14px; border-bottom:1px solid {HAIRLINE_SOFT}; color:{BODY}; vertical-align:middle; }}
+table.dt tbody tr:last-child td {{ border-bottom:none; }}
+table.dt tbody tr:hover {{ background:{CANVAS_SOFT}; }}
+.cell-id {{
+  display:inline-flex; align-items:center; gap:6px;
+  font-family:{FONT_MONO}; font-size:12.5px; color:{INK};
+  background:{CANVAS_SOFT}; border:1px solid {HAIRLINE}; border-radius:7px; padding:5px 9px;
+  max-width:170px;
+}}
+.cell-id span {{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }}
+.copy {{ display:inline-flex; color:{FAINT}; border:1px solid {HAIRLINE}; border-radius:6px; padding:3px; background:{CANVAS}; }}
+.caller {{ font-weight:600; color:{INK}; }}
+.caller small {{ display:block; font-weight:400; color:{FAINT}; font-size:11.5px; margin-top:1px; }}
+.badge {{ display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:9999px; }}
+.dot {{ width:6px; height:6px; border-radius:50%; }}
+.tag {{ font-size:11.5px; font-weight:500; color:{MUTE}; background:{CANVAS_SOFT}; border:1px solid {HAIRLINE}; padding:3px 8px; border-radius:6px; }}
+.score {{ font-weight:600; font-variant-numeric:tabular-nums; }}
+.cbx {{ width:15px; height:15px; border:1.5px solid #cbd0d6; border-radius:4px; display:inline-block; }}
+.chev {{ color:{FAINT}; }}
+
+/* row action popover */
+details.rowmenu {{ position:relative; }}
+details.rowmenu > summary {{ list-style:none; cursor:pointer; color:{FAINT}; display:inline-flex; padding:4px; border-radius:6px; }}
+details.rowmenu > summary::-webkit-details-marker {{ display:none; }}
+details.rowmenu[open] > summary {{ background:{CANVAS_SOFT}; color:{INK}; }}
+.menu {{
+  position:absolute; left:0; top:28px; z-index:80; width:210px;
+  background:{CANVAS}; border:1px solid {HAIRLINE}; border-radius:12px;
+  box-shadow:0 12px 32px rgba(15,23,42,0.14); padding:6px; text-align:left;
+}}
+.menu .mh {{ font-size:11px; font-weight:600; letter-spacing:.5px; text-transform:uppercase; color:{FAINT}; padding:8px 10px 6px; }}
+.menu a {{ display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:8px; font-size:13.5px; color:{BODY}; text-decoration:none; }}
+.menu a:hover {{ background:{CANVAS_SOFT}; color:{INK}; }}
+.menu a svg {{ color:{MUTE}; }}
+.menu a.danger:hover {{ background:{RED_BG}; color:{RED_TX}; }}
+.menu a.danger:hover svg {{ color:{RED_TX}; }}
+
+/* ── Panels / charts ── */
+.panel {{ background:{CANVAS}; border:1px solid {HAIRLINE}; border-radius:13px; padding:20px 22px; height:100%; }}
+.panel h3 {{ font-size:15px; font-weight:600; margin:0 0 2px; color:{INK}; }}
+.panel .cap {{ font-size:12.5px; color:{MUTE}; margin-bottom:6px; }}
+.eyebrow {{ font-size:11px; font-weight:600; letter-spacing:.8px; text-transform:uppercase; color:{FAINT}; margin-bottom:10px; }}
+
+/* ── Config / list rows ── */
+.kv {{ display:grid; grid-template-columns:200px 1fr; gap:0; }}
+.kv .k {{ padding:13px 0; border-bottom:1px solid {HAIRLINE_SOFT}; font-size:13px; color:{MUTE}; font-weight:500; }}
+.kv .v {{ padding:13px 0; border-bottom:1px solid {HAIRLINE_SOFT}; font-size:13.5px; color:{INK}; }}
+.listrow {{ display:flex; align-items:center; justify-content:space-between; padding:13px 16px; border:1px solid {HAIRLINE}; border-radius:10px; margin-bottom:8px; }}
+.listrow .t {{ font-size:14px; font-weight:500; color:{INK}; }}
+.listrow .d {{ font-size:12.5px; color:{MUTE}; margin-top:2px; }}
+.sectitle {{ font-size:16px; font-weight:600; color:{INK}; margin:6px 0 14px; }}
+[data-testid="stPlotlyChart"] {{ margin-top:4px; }}
+
+/* ── shadcn-styled native Streamlit widgets ── */
+.stMainBlockContainer .toolwrap {{ padding:0 28px; max-width:1320px; }}
+
+/* Text input → shadcn Input */
+[data-testid="stTextInputRootElement"] {{ border:1px solid {HAIRLINE}; border-radius:8px; background:{CANVAS}; box-shadow:0 1px 2px rgba(10,10,10,0.04); }}
+[data-testid="stTextInputRootElement"]:focus-within {{ border-color:{ACCENT}; box-shadow:0 0 0 3px rgba(10,10,10,0.08); }}
+[data-testid="stTextInput"] input {{ font-family:{FONT}; font-size:13.5px !important; color:{INK}; padding:8px 12px; }}
+[data-testid="stTextInput"] input::placeholder {{ color:{FAINT}; }}
+[data-testid="stTextInputRootElement"] > div {{ border:none !important; }}
+
+/* Segmented control / pills → shadcn Tabs / ToggleGroup */
+[data-testid="stSegmentedControl"] [role="radiogroup"],
+[data-testid="stPills"] [role="radiogroup"] {{
+  background:{CANVAS_SOFT}; border:1px solid {HAIRLINE}; border-radius:9px; padding:3px; gap:2px;
+}}
+[data-testid="stSegmentedControl"] button, [data-testid="stPills"] button {{
+  background:transparent !important; border:none !important; color:{MUTE} !important;
+  font-family:{FONT}; font-size:13px !important; font-weight:500 !important;
+  border-radius:7px !important; padding:5px 14px !important; box-shadow:none !important;
+}}
+[data-testid="stSegmentedControl"] button:hover, [data-testid="stPills"] button:hover {{ color:{INK} !important; }}
+[data-testid="stSegmentedControl"] button[aria-checked="true"],
+[data-testid="stPills"] button[aria-checked="true"] {{
+  background:{CANVAS} !important; color:{INK} !important; font-weight:600 !important;
+  box-shadow:0 1px 2px rgba(10,10,10,0.1) !important;
+}}
+
+/* Buttons → shadcn Button (outline + primary) */
+[data-testid="stButton"] button {{
+  font-family:{FONT}; font-size:13px; font-weight:500; border-radius:8px;
+  border:1px solid {HAIRLINE}; background:{CANVAS}; color:{INK};
+  padding:7px 14px; box-shadow:0 1px 2px rgba(10,10,10,0.04); transition:background .15s ease;
+}}
+[data-testid="stButton"] button:hover {{ background:{CANVAS_SOFT}; border-color:{HAIRLINE}; color:{INK}; }}
+[data-testid="stButton"] button[kind="primary"], [data-testid="stBaseButton-primary"] {{
+  background:{ACCENT}; color:#fafafa; border-color:{ACCENT};
+}}
+[data-testid="stButton"] button[kind="primary"]:hover, [data-testid="stBaseButton-primary"]:hover {{
+  background:#262626; color:#fafafa; border-color:#262626;
+}}
+
+/* Multiselect → shadcn-style chips */
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div {{
+  border:1px solid {HAIRLINE} !important; border-radius:8px; background:{CANVAS}; min-height:38px;
+  box-shadow:0 1px 2px rgba(10,10,10,0.04);
+}}
+[data-testid="stMultiSelect"] [data-baseweb="tag"] {{
+  background:{ACCENT_SOFT} !important; color:{INK} !important; border-radius:6px;
+  font-family:{FONT}; font-weight:500; font-size:12px;
+}}
+[data-testid="stMultiSelect"] [data-baseweb="tag"] svg {{ fill:{MUTE}; }}
+
+/* Labels → shadcn label (text-sm font-medium) */
+[data-testid="stWidgetLabel"] label p {{ font-family:{FONT}; font-size:12.5px; font-weight:500; color:{BODY}; }}
+
+/* Toast → shadcn sonner */
+[data-testid="stToast"] {{
+  background:{CANVAS}; border:1px solid {HAIRLINE}; border-radius:10px;
+  color:{INK}; box-shadow:0 8px 24px rgba(10,10,10,0.12); font-family:{FONT};
+}}
+
+/* Selection action bar */
+.actionbar {{
+  display:flex; align-items:center; gap:14px;
+  background:{INK}; color:#fafafa; border-radius:10px; padding:10px 16px; margin:4px 0 14px;
+  font-size:13px; font-weight:500; box-shadow:0 8px 24px rgba(10,10,10,0.18);
+}}
+.actionbar .cnt {{ background:rgba(255,255,255,0.16); border-radius:6px; padding:2px 9px; font-weight:600; font-variant-numeric:tabular-nums; }}
+tr.sel td {{ background:{CANVAS_SOFT}; }}
+.cbx.on {{ background:{ACCENT}; border-color:{ACCENT}; position:relative; }}
+.cbx.on::after {{ content:""; position:absolute; left:4px; top:1px; width:4px; height:8px; border:solid #fff; border-width:0 1.6px 1.6px 0; transform:rotate(45deg); }}
+.labtag {{ font-size:10.5px; font-weight:600; color:{ACCENT_TEXT}; background:{ACCENT_SOFT}; border:1px solid {HAIRLINE}; padding:2px 7px; border-radius:6px; margin-left:6px; }}
 </style>
 """,
     unsafe_allow_html=True,
 )
 
-# ── Data ─────────────────────────────────────────────────────────────────────
-today = get_today()
-week = get_week()
-funnel = get_funnel()
-declines = get_decline_reasons()
-hours, days, heat_values = get_call_heatmap()
-pipeline = estimated_pipeline(week.qualified_leads)
-qual_rate = today.qualified / today.total_calls * 100 if today.total_calls else 0
-after_hours_pct = today.after_hours_calls / today.total_calls * 100 if today.total_calls else 0
+
+# ── Sidebar ──────────────────────────────────────────────────────────────────
+def render_sidebar() -> None:
+    initials = "".join(w[0] for w in AGENT_NAME.split())[:2].upper()
+    html = [
+        f'<div class="sb-brand"><div class="sb-logo">{initials}</div>'
+        f'<div><div class="nm">{AGENT_NAME}</div><div class="sub">{FIRM_NAME}</div></div></div>',
+        '<div class="sb-nav">',
+    ]
+    for group, items in NAV:
+        html.append(f'<div class="sb-group">{group}</div>')
+        for key, label in items:
+            active = "active" if key == PAGE else ""
+            icon = ICONS.get(key, "")
+            html.append(
+                f'<a class="sb-item {active}" href="?page={key}" target="_self">{icon}<span>{label}</span></a>'
+            )
+    html.append("</div>")
+    st.sidebar.markdown("".join(html), unsafe_allow_html=True)
 
 
-def chart_number_annotation(value: int | str, label: str = "") -> dict:
-    """Center label style matching donut '67 DECLINED' treatment."""
-    label_html = ""
-    if label:
-        label_html = (
-            f"<br><span style='font-size:10px;font-family:JetBrains Mono,monospace;"
-            f"letter-spacing:1px;color:{MUTE}'>{label.upper()}</span>"
-        )
-    return dict(
-        text=(
-            f"<span style='font-size:28px;letter-spacing:-0.03em;font-family:Inter,"
-            f"system-ui,sans-serif;color:{INK}'>{value}</span>{label_html}"
-        ),
-        font=dict(size=CHART_NUM_SIZE, color=INK, family=FONT),
-        showarrow=False,
+def topbar() -> None:
+    title, crumb = PAGE_META.get(PAGE, ("", ""))
+    st.markdown(
+        f"""
+<div class="topbar">
+  <div>
+    <h1>{title}</h1>
+    <div class="crumb">{crumb}</div>
+  </div>
+  <div class="tb-right">
+    <div class="searchbox">{ICONS['search']}<span>Search calls, leads…</span></div>
+    <span class="vbadge">{AGENT_VERSION}</span>
+    <span class="live"><span class="dot"></span>Live</span>
+    <div class="avatar">MA</div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
     )
 
 
-def dark_layout(**overrides) -> dict:
+def light_layout(**overrides) -> dict:
     base = dict(
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
-        font=dict(family=FONT, color=BODY, size=13),
+        font=dict(family=FONT, color=BODY, size=12),
         margin=dict(l=8, r=8, t=8, b=8),
-        hoverlabel=dict(
-            bgcolor=CANVAS_CARD,
-            bordercolor=HAIRLINE,
-            font=dict(family=FONT, size=13, color=INK),
-        ),
-        transition=dict(duration=600, easing="cubic-in-out"),
+        hoverlabel=dict(bgcolor=CANVAS, bordercolor=HAIRLINE, font=dict(family=FONT, color=INK)),
     )
     base.update(overrides)
     return base
 
 
-def mono_axis(**extra) -> dict:
-    return dict(
-        gridcolor=HAIRLINE,
-        zeroline=False,
-        tickfont=dict(**CHART_AXIS_FONT),
-        **extra,
-    )
+def disposition_badge(d: str) -> str:
+    palette = {
+        "Qualified": (GREEN_BG, GREEN_TX),
+        "Declined": (RED_BG, RED_TX),
+        "Transferred": (BLUE_BG, BLUE_TX),
+    }
+    bg, tx = palette.get(d, (CANVAS_SOFT, MUTE))
+    return f'<span class="badge" style="background:{bg};color:{tx}"><span class="dot" style="background:{tx}"></span>{d}</span>'
 
 
-st.markdown(
-    f"""
-<div class="nav animate-nav">
-  <span class="nav-brand">{FIRM_NAME}</span>
-  <div class="nav-links">
-    <span class="pill pill-sm delay-1">Intake</span>
-    <span class="pill pill-sm delay-2">Reports</span>
-    <span class="pill pill-filled pill-sm pill-live delay-3"><span class="status-dot"></span>Live</span>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+# ── Stateful action handling (row 3-dot + bulk) ──────────────────────────────
+def _init_state() -> None:
+    for key in ("deleted_ids", "lab_ids", "sim_ids"):
+        if key not in st.session_state:
+            st.session_state[key] = set()
 
-st.markdown(
-    f"""
-<div class="hero animate-hero">
-  <div class="eyebrow delay-1">AI intake · {FIRM_TAGLINE}</div>
-  <h1><span class="hero-line">Every call captured.</span><br><span class="hero-line hero-line-2">Every lead qualified.</span></h1>
-  <p class="hero-lead delay-3">
-    Real-time performance for your after-hours voice intake agent — calls, qualification,
-    and revenue pipeline at a glance.
-  </p>
-</div>
-""",
-    unsafe_allow_html=True,
-)
 
-st.markdown(
-    f"""
-<div class="after-hours animate-block delay-2">
-  <div class="after-hours-inner">
-    <div class="eyebrow">After-hours capture</div>
-    <h2>Leads that would have gone to voicemail</h2>
-    <p class="sub">Calls handled when your office is closed — evenings, nights, and weekends.</p>
-    <div class="stat-row">
-      <div class="stat-block animate-card delay-3">
-        <div class="val">{today.after_hours_calls}</div>
-        <div class="lbl">Calls today</div>
-      </div>
-      <div class="stat-block animate-card delay-4">
-        <div class="val">{today.after_hours_qualified}</div>
-        <div class="lbl">Qualified after-hours</div>
-      </div>
-      <div class="stat-block animate-card delay-5">
-        <div class="val">{after_hours_pct:.0f}%</div>
-        <div class="lbl">Of today's volume</div>
-      </div>
-    </div>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
+def _handle_row_action() -> None:
+    """Row 3-dot menu links set ?act=&cid=; perform, flash, clean URL."""
+    act = st.query_params.get("act")
+    cid = st.query_params.get("cid")
+    if not (act and cid):
+        return
+    label = {"lab": "Added to Lab", "delete": "Deleted call", "sim": "Simulation created from"}.get(act, "")
+    if act == "delete":
+        st.session_state.deleted_ids.add(cid)
+    elif act == "lab":
+        st.session_state.lab_ids.add(cid)
+    elif act == "sim":
+        st.session_state.sim_ids.add(cid)
+    st.session_state.flash = f"{label} {cid}"
+    f = st.query_params.get("f", "all")
+    st.query_params.clear()
+    st.query_params["page"] = "calls"
+    st.query_params["f"] = f
+    st.rerun()
 
-st.markdown(
-    f"""
-<div class="section animate-block delay-3">
-  <div class="section-head">
-    <div class="eyebrow">Overview</div>
-    <h2>Today's performance</h2>
-  </div>
-  <div class="kpi-grid">
-    <div class="kpi-card animate-card delay-4">
-      <div class="label">Today's calls</div>
-      <div class="value">{today.total_calls}</div>
-      <div class="sub">{today.business_hours_calls} business · {today.after_hours_calls} after-hours</div>
-    </div>
-    <div class="kpi-card animate-card delay-5">
-      <div class="label">Qualified</div>
-      <div class="value accent">{today.qualified}</div>
-      <div class="sub">{qual_rate:.0f}% qualification rate</div>
-    </div>
-    <div class="kpi-card animate-card delay-6">
-      <div class="label">Declined</div>
-      <div class="value">{today.declined}</div>
-      <div class="sub">Out of scope or incomplete</div>
-    </div>
-    <div class="kpi-card animate-card delay-7">
-      <div class="label">Weekly qualified</div>
-      <div class="value accent">{week.qualified_leads}</div>
-      <div class="sub">+12% vs last week</div>
-    </div>
-    <div class="kpi-card kpi-featured animate-card delay-8">
-      <div class="label">Est. pipeline</div>
-      <div class="value">{format_currency(pipeline)}</div>
-      <div class="sub">{week.qualified_leads} leads × {format_currency(AVG_CASE_VALUE)} avg</div>
-    </div>
-  </div>
-</div>
-""",
-    unsafe_allow_html=True,
-)
 
-st.markdown('<div class="divider"></div>', unsafe_allow_html=True)
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: Calls  (Cekura × Agiloft data table — fully interactive)
+# ════════════════════════════════════════════════════════════════════════════
+def page_calls() -> None:
+    _init_state()
+    _handle_row_action()
+    if "flash" in st.session_state:
+        st.toast(st.session_state.pop("flash"), icon="✅")
 
-# ── Charts row 1 ─────────────────────────────────────────────────────────────
-col_l, col_r = st.columns([1, 1.15])
+    deleted = st.session_state.deleted_ids
+    lab_ids = st.session_state.lab_ids
+    calls = [c for c in get_calls() if c.call_id not in deleted]
+    k = call_kpis(calls)
+    qrate = round(k["qualified"] / k["total"] * 100) if k["total"] else 0
 
-with col_l:
     st.markdown(
-        """
-<div class="section animate-chart delay-5" style="padding-bottom:24px;">
-  <div class="chart-wrap">
-    <div class="eyebrow">Today</div>
-    <h3>Qualified vs declined</h3>
-    <p class="caption">Call disposition breakdown</p>
+        f"""
+<div class="page" style="padding-bottom:14px">
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Total calls</div><div class="val">{k['total']}</div><div class="delta">Last 48 hours</div></div>
+    <div class="kpi"><div class="lbl">Qualified</div><div class="val accent">{k['qualified']}</div><div class="delta up">↑ {qrate}% qualification rate</div></div>
+    <div class="kpi"><div class="lbl">Declined</div><div class="val">{k['declined']}</div><div class="delta">Out of scope / SoL</div></div>
+    <div class="kpi"><div class="lbl">After-hours</div><div class="val">{k['after_hours']}</div><div class="delta">Would've gone to voicemail</div></div>
+    <div class="kpi"><div class="lbl">Avg eval score</div><div class="val accent">{k['avg_score']}</div><div class="delta up">↑ +14 vs v1</div></div>
+  </div>
+</div>
 """,
         unsafe_allow_html=True,
     )
-    fig_today = go.Figure()
-    fig_today.add_trace(
-        go.Bar(
-            x=["Qualified", "Declined"],
-            y=[today.qualified, today.declined],
-            marker=dict(
-                color=[ACCENT_WARM, CANVAS_MID],
-                line=dict(width=0),
-                cornerradius=6,
-            ),
-            text=[str(today.qualified), str(today.declined)],
-            textposition="outside",
-            textfont=CHART_NUM_FONT,
-            width=0.45,
+
+    # ── Interactive toolbar: search + filter + bulk selection ──
+    st.markdown('<div class="toolwrap">', unsafe_allow_html=True)
+    c1, c2 = st.columns([1, 1.3], gap="small")
+    with c1:
+        query = st.text_input("Search", placeholder="Search caller, case, or ID…",
+                              label_visibility="collapsed", key="calls_q")
+    with c2:
+        seg_labels = ["All", "Qualified", "Declined", "Transferred", "After-hours"]
+        choice = st.segmented_control("Filter", seg_labels, default="All",
+                                      label_visibility="collapsed", key="calls_seg")
+
+    q = (query or "").strip().lower()
+
+    def keep(c) -> bool:
+        if choice == "After-hours":
+            disp_ok = c.channel == "After-hours"
+        elif choice and choice != "All":
+            disp_ok = c.disposition == choice
+        else:
+            disp_ok = True
+        text = f"{c.call_id} {c.caller} {c.case_type} {c.summary}".lower()
+        return disp_ok and (q in text if q else True)
+
+    visible = [c for c in calls if keep(c)]
+    ids = [c.call_id for c in visible]
+    caller_by_id = {c.call_id: c.caller for c in calls}
+
+    selected = st.multiselect(
+        "Select calls for bulk actions", ids,
+        format_func=lambda i: f"{i}  ·  {caller_by_id.get(i, '')}",
+        label_visibility="collapsed", placeholder="Select calls for bulk actions…",
+        key="calls_sel",
+    )
+    sel_set = {i for i in selected if i in ids}
+
+    if sel_set:
+        st.markdown(
+            f'<div class="actionbar"><span class="cnt">{len(sel_set)}</span> selected</div>',
+            unsafe_allow_html=True,
         )
-    )
-    fig_today.update_layout(
-        **dark_layout(height=300),
-        yaxis=mono_axis(title=""),
-        xaxis=dict(showgrid=False, tickfont=dict(**CHART_AXIS_FONT)),
-        showlegend=False,
-        bargap=0.4,
-    )
-    st.plotly_chart(fig_today, use_container_width=True, config=PLOT_CONFIG)
-    st.markdown("</div></div>", unsafe_allow_html=True)
+        b1, b2, b3, _ = st.columns([1, 1.2, 1, 4])
+        if b1.button("Add to Lab", key="bulk_lab"):
+            st.session_state.lab_ids |= sel_set
+            st.toast(f"Added {len(sel_set)} call(s) to Lab", icon="✅")
+            st.rerun()
+        if b2.button("Create Simulation", key="bulk_sim"):
+            st.session_state.sim_ids |= sel_set
+            st.toast(f"Created simulation from {len(sel_set)} call(s)", icon="✅")
+            st.rerun()
+        if b3.button("Delete", key="bulk_del", type="primary"):
+            st.session_state.deleted_ids |= sel_set
+            st.toast(f"Deleted {len(sel_set)} call(s)", icon="✅")
+            st.rerun()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-with col_r:
-    st.markdown(
-        """
-<div class="section animate-chart delay-6" style="padding-bottom:24px;">
-  <div class="chart-wrap">
-    <div class="eyebrow">This week</div>
-    <h3>Conversion funnel</h3>
-    <p class="caption">Call → qualified → consultation → retainer</p>
-""",
-        unsafe_allow_html=True,
-    )
-    funnel_labels = [s.label for s in funnel]
-    funnel_values = [s.count for s in funnel]
-    fig_funnel = go.Figure(
-        go.Funnel(
-            y=funnel_labels,
-            x=funnel_values,
-            textinfo="value",
-            textposition="inside",
-            textfont=CHART_NUM_FONT,
-            marker=dict(
-                color=[CANVAS_MID, ACCENT_MUTED, ACCENT_COOL, ACCENT_WARM],
-                line=dict(width=1, color=HAIRLINE),
-            ),
+    # ── Table ──
+    rows = []
+    for c in visible:
+        on = "on" if c.call_id in sel_set else ""
+        selcls = "sel" if c.call_id in sel_set else ""
+        lang_tag = "🌐 ES" if c.language == "Spanish" else "EN"
+        sc = GREEN_TX if c.score >= 90 else (AMBER_TX if c.score >= 85 else MUTE)
+        labtag = '<span class="labtag">Lab</span>' if c.call_id in lab_ids else ""
+        rows.append(
+            f"""
+<tr class="{selcls}">
+  <td><span class="cbx {on}"></span></td>
+  <td>
+    <details class="rowmenu"><summary>{ICONS['dots']}</summary>
+      <div class="menu">
+        <div class="mh">Actions</div>
+        <a href="?page=calls&f={FILTER}&act=lab&cid={c.call_id}" target="_self">{ICONS['flask']} Add to Lab</a>
+        <a href="?page=calls&f={FILTER}&act=sim&cid={c.call_id}" target="_self">{ICONS['globe']} Create a Simulation</a>
+        <a href="?page=calls&f={FILTER}&act=delete&cid={c.call_id}" target="_self" class="danger">{ICONS['trash']} Delete</a>
+      </div>
+    </details>
+  </td>
+  <td><span class="cell-id"><span>{c.call_id}</span></span> <span class="copy">{ICONS['copy']}</span>{labtag}</td>
+  <td style="white-space:nowrap">{c.started_at}</td>
+  <td><div class="caller">{c.caller}<small>{c.phone}</small></div></td>
+  <td>{c.case_type}</td>
+  <td>{disposition_badge(c.disposition)}</td>
+  <td><span class="score" style="color:{sc}">{c.score}</span></td>
+  <td style="font-variant-numeric:tabular-nums">{c.duration}</td>
+  <td><span class="tag">{c.channel}</span></td>
+  <td><span class="tag">{lang_tag}</span></td>
+</tr>"""
         )
+
+    empty = (
+        f'<tr><td colspan="11" style="text-align:center;color:{MUTE};padding:40px">'
+        f'No calls match your filters.</td></tr>'
     )
-    fig_funnel.update_layout(**dark_layout(height=300), funnelmode="stack")
-    st.plotly_chart(fig_funnel, use_container_width=True, config=PLOT_CONFIG)
-    st.markdown("</div></div>", unsafe_allow_html=True)
-
-# ── Charts row 2 ─────────────────────────────────────────────────────────────
-col_l2, col_r2 = st.columns([1, 1.35])
-
-with col_l2:
     st.markdown(
-        """
-<div class="section animate-chart delay-7" style="padding-bottom:24px;">
-  <div class="chart-wrap">
-    <div class="eyebrow">30 days</div>
-    <h3>Top decline reasons</h3>
-    <p class="caption">Why callers didn't qualify</p>
+        f"""
+<div class="page" style="padding-top:0">
+  <div class="tbl-wrap">
+    <table class="dt">
+      <thead><tr>
+        <th style="width:34px"></th>
+        <th style="width:34px"></th>
+        <th>Call ID</th><th>Time</th><th>Caller</th><th>Case type</th>
+        <th>Disposition</th><th>Score</th><th>Duration</th><th>Channel</th><th>Lang</th>
+      </tr></thead>
+      <tbody>{''.join(rows) if rows else empty}</tbody>
+    </table>
+  </div>
+  <div style="font-size:12.5px;color:{MUTE};margin-top:10px">
+    Showing {len(visible)} of {k['total']} calls{' · ' + str(len(deleted)) + ' deleted this session' if deleted else ''}
+  </div>
+</div>
 """,
         unsafe_allow_html=True,
     )
-    labels = list(declines.keys())
-    values = list(declines.values())
-    donut_colors = [ACCENT_WARM, ACCENT_COOL, ACCENT, ACCENT_MUTED, CANVAS_MID, MUTE]
 
-    fig_donut = go.Figure(
-        go.Pie(
-            labels=labels,
-            values=values,
-            hole=0.62,
-            marker=dict(colors=donut_colors, line=dict(color=CANVAS_CARD, width=2)),
-            textinfo="value",
-            textposition="inside",
-            textfont=CHART_NUM_FONT,
+
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: Overview
+# ════════════════════════════════════════════════════════════════════════════
+def page_overview() -> None:
+    today = get_today()
+    week = get_week()
+    funnel = get_funnel()
+    declines = get_decline_reasons()
+    hours, days, heat = get_call_heatmap()
+    pipeline = estimated_pipeline(week.qualified_leads)
+    qual_rate = today.qualified / today.total_calls * 100 if today.total_calls else 0
+    ah_pct = today.after_hours_calls / today.total_calls * 100 if today.total_calls else 0
+
+    st.markdown(
+        f"""
+<div class="page">
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Today's calls</div><div class="val">{today.total_calls}</div><div class="delta">{today.business_hours_calls} business · {today.after_hours_calls} after-hours</div></div>
+    <div class="kpi"><div class="lbl">Qualified</div><div class="val accent">{today.qualified}</div><div class="delta up">↑ {qual_rate:.0f}% qualification rate</div></div>
+    <div class="kpi"><div class="lbl">After-hours share</div><div class="val">{ah_pct:.0f}%</div><div class="delta">{today.after_hours_qualified} qualified after-hours</div></div>
+    <div class="kpi"><div class="lbl">Weekly qualified</div><div class="val accent">{week.qualified_leads}</div><div class="delta up">↑ +12% vs last week</div></div>
+    <div class="kpi"><div class="lbl">Est. pipeline</div><div class="val">{format_currency(pipeline)}</div><div class="delta">{week.qualified_leads} × {format_currency(AVG_CASE_VALUE)} avg</div></div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown('<div style="padding:0 28px;max-width:1320px">', unsafe_allow_html=True)
+    c1, c2 = st.columns([1, 1.15], gap="medium")
+    with c1:
+        st.markdown('<div class="panel"><div class="eyebrow">This week</div><h3>Conversion funnel</h3>'
+                    '<p class="cap">Call → qualified → consultation → retainer</p>', unsafe_allow_html=True)
+        fig = go.Figure(go.Funnel(
+            y=[s.label for s in funnel], x=[s.count for s in funnel],
+            textinfo="value", textfont=dict(color="#fff", size=15, family=FONT),
+            marker=dict(color=["#d4d4d4", "#a3a3a3", "#525252", ACCENT]),
+            connector=dict(line=dict(color=HAIRLINE, width=1)),
+        ))
+        fig.update_layout(**light_layout(height=300))
+        st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
+        st.markdown("</div>", unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="panel"><div class="eyebrow">30 days</div><h3>Top decline reasons</h3>'
+                    '<p class="cap">Why callers did not qualify</p>', unsafe_allow_html=True)
+        fig = go.Figure(go.Pie(
+            labels=list(declines.keys()), values=list(declines.values()), hole=0.6,
+            marker=dict(colors=RAMP, line=dict(color=CANVAS, width=2)),
+            textinfo="value", textfont=dict(color="#fff", size=13),
             hovertemplate="%{label}<br>%{value} calls (%{percent})<extra></extra>",
-        )
-    )
-    fig_donut.update_layout(
-        **dark_layout(height=380),
-        showlegend=True,
-        legend=dict(
-            orientation="v",
-            yanchor="middle",
-            y=0.5,
-            x=1.02,
-            font=dict(size=10, color=MUTE, family=FONT_MONO),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-        annotations=[
-            {
-                **chart_number_annotation(sum(values), "declined"),
-                "x": 0.5,
-                "y": 0.5,
-            }
-        ],
-    )
-    st.plotly_chart(fig_donut, use_container_width=True, config=PLOT_CONFIG)
+        ))
+        fig.update_layout(**light_layout(height=300), showlegend=True,
+                          legend=dict(font=dict(size=11, color=MUTE), x=1.0, y=0.5))
+        st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div style="height:16px"></div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><div class="eyebrow">Volume</div><h3>Call heatmap</h3>'
+                '<p class="cap">Hour blocks × day of week — evening & weekend peaks</p>', unsafe_allow_html=True)
+    fig = go.Figure(go.Heatmap(
+        z=heat, x=days, y=hours, xgap=2, ygap=2,
+        colorscale=[[0, "#fafafa"], [0.35, "#d4d4d4"], [0.7, "#737373"], [1, ACCENT]],
+        hovertemplate="%{y} · %{x}<br>%{z} calls<extra></extra>",
+        colorbar=dict(tickfont=dict(color=MUTE), outlinewidth=0, thickness=10),
+    ))
+    fig.update_layout(**light_layout(height=360),
+                      xaxis=dict(side="top", tickfont=dict(color=MUTE)),
+                      yaxis=dict(autorange="reversed", tickfont=dict(color=MUTE)))
+    st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
     st.markdown("</div></div>", unsafe_allow_html=True)
 
-with col_r2:
+
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: Metrics
+# ════════════════════════════════════════════════════════════════════════════
+def page_metrics() -> None:
+    scores = VERSION_SCORES if HAS_SIM else {"v1": 62, "v2": 77, "v3": 89}
     st.markdown(
-        """
-<div class="section animate-chart delay-8" style="padding-bottom:24px;">
-  <div class="chart-wrap">
-    <div class="eyebrow">Volume</div>
-    <h3>Call heatmap</h3>
-    <p class="caption">Hours × day of week — evening & weekend peaks</p>
+        f"""
+<div class="page">
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Qualification accuracy</div><div class="val accent">{scores['v3']}%</div><div class="delta up">↑ +{scores['v3']-scores['v1']}pp vs v1</div></div>
+    <div class="kpi"><div class="lbl">Median latency</div><div class="val">740ms</div><div class="delta up">↓ -180ms vs v1</div></div>
+    <div class="kpi"><div class="lbl">Avg call duration</div><div class="val">5:24</div><div class="delta">Across qualified calls</div></div>
+    <div class="kpi"><div class="lbl">Containment</div><div class="val">82%</div><div class="delta">Handled without transfer</div></div>
+    <div class="kpi"><div class="lbl">Eval pass rate</div><div class="val accent">{scores['v3']}%</div><div class="delta up">↑ trending up</div></div>
+  </div>
+</div>
 """,
         unsafe_allow_html=True,
     )
-    fig_heat = go.Figure(
-        data=go.Heatmap(
-            z=heat_values,
-            x=days,
-            y=hours,
-            colorscale=[
-                [0, CANVAS],
-                [0.2, CANVAS_SOFT],
-                [0.45, CANVAS_MID],
-                [0.7, ACCENT_MUTED],
-                [1, ACCENT_COOL],
-            ],
-            text=heat_values,
-            texttemplate="%{text}",
-            textfont=CHART_NUM_FONT,
-            hovertemplate="%{y} · %{x}<br>%{z} calls<extra></extra>",
-            colorbar=dict(
-                title=dict(text="", font=dict(color=MUTE)),
-                tickfont=dict(**CHART_AXIS_FONT),
-                bgcolor="rgba(0,0,0,0)",
-                borderwidth=0,
-            ),
-        )
-    )
-    fig_heat.update_layout(
-        **dark_layout(height=380),
-        xaxis=dict(
-            side="top",
-            tickfont=dict(**CHART_AXIS_FONT),
-        ),
-        yaxis=dict(
-            autorange="reversed",
-            tickfont=dict(**CHART_AXIS_FONT),
-        ),
-    )
-    st.plotly_chart(fig_heat, use_container_width=True, config=PLOT_CONFIG)
-    st.markdown("</div></div>", unsafe_allow_html=True)
+    st.markdown('<div style="padding:0 28px;max-width:1320px">', unsafe_allow_html=True)
+    c1, c2 = st.columns([1.15, 1], gap="medium")
+    with c1:
+        st.markdown('<div class="panel"><div class="eyebrow">Quality</div><h3>Score progression</h3>'
+                    '<p class="cap">Aggregate evaluator score by prompt version</p>', unsafe_allow_html=True)
+        versions = ["v1", "v2", "v3"]
+        ys = [scores[v] for v in versions]
+        fig = go.Figure(go.Scatter(
+            x=versions, y=ys, mode="lines+markers+text",
+            text=[f"{v}%" for v in ys], textposition="top center",
+            textfont=dict(color=INK, size=13), line=dict(color=ACCENT, width=3),
+            marker=dict(size=12, color=ACCENT),
+        ))
+        fig.update_layout(**light_layout(height=320),
+                          yaxis=dict(range=[50, 100], gridcolor=HAIRLINE, tickfont=dict(color=MUTE)),
+                          xaxis=dict(tickfont=dict(color=MUTE)))
+        st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
+        st.markdown("</div>", unsafe_allow_html=True)
+    with c2:
+        st.markdown('<div class="panel"><div class="eyebrow">Latency</div><h3>Response time by version</h3>'
+                    '<p class="cap">Median time-to-first-byte (ms)</p>', unsafe_allow_html=True)
+        fig = go.Figure(go.Bar(
+            x=["v1", "v2", "v3"], y=[920, 810, 740],
+            marker=dict(color=["#d4d4d4", "#737373", ACCENT], cornerradius=8),
+            text=["920", "810", "740"], textposition="outside", textfont=dict(color=INK, size=13), width=0.5,
+        ))
+        fig.update_layout(**light_layout(height=320), bargap=0.4,
+                          yaxis=dict(gridcolor=HAIRLINE, tickfont=dict(color=MUTE)),
+                          xaxis=dict(tickfont=dict(color=MUTE)))
+        st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
+        st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-st.markdown(
-    """
-<div class="footer">
-  <div class="mono">Morrison &amp; associates · intake analytics</div>
-  <p>Sample data for demonstration · Wire to Cekura &amp; Twilio for live metrics</p>
+
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: Simulation Results
+# ════════════════════════════════════════════════════════════════════════════
+def page_results() -> None:
+    if not HAS_SIM:
+        st.markdown('<div class="page"><div class="panel">Simulation data unavailable.</div></div>',
+                    unsafe_allow_html=True)
+        return
+    scores = VERSION_SCORES
+    delta = round(scores["v3"] - scores["v1"], 1)
+    st.markdown(
+        f"""
+<div class="page">
+  <div class="kpis" style="grid-template-columns:repeat(4,1fr)">
+    <div class="kpi"><div class="lbl">v1 baseline</div><div class="val">{scores['v1']}%</div><div class="delta">Initial prompt</div></div>
+    <div class="kpi"><div class="lbl">v2</div><div class="val">{scores['v2']}%</div><div class="delta up">↑ SoL + empathy</div></div>
+    <div class="kpi"><div class="lbl">v3 current</div><div class="val accent">{scores['v3']}%</div><div class="delta up">↑ Spanish + fault logic</div></div>
+    <div class="kpi"><div class="lbl">Total gain</div><div class="val accent">+{delta}pp</div><div class="delta up">10 personas · 10 evaluators</div></div>
+  </div>
 </div>
 """,
-    unsafe_allow_html=True,
-)
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div style="padding:0 28px;max-width:1320px">', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><div class="eyebrow">Latest run</div><h3>Per-persona evaluator heatmap (v3)</h3>'
+                '<p class="cap">Each cell = one evaluator graded against one caller persona</p>', unsafe_allow_html=True)
+    sel = SCORES_V3
+    fig = go.Figure(go.Heatmap(
+        z=sel, x=EVALUATORS, y=[p[:26] for p in PERSONAS],
+        colorscale=[[0, RED_BG], [0.5, AMBER_BG], [1, "#86efac"]], zmin=0, zmax=1,
+        xgap=3, ygap=3, showscale=False,
+        hovertemplate="%{y}<br>%{x}: %{z}<extra></extra>",
+    ))
+    ann = []
+    for i in range(len(PERSONAS)):
+        for j in range(len(EVALUATORS)):
+            v = sel[i][j]
+            sym = "✓" if v == 1 else ("~" if v == 0.5 else "✗")
+            col = GREEN_TX if v == 1 else (AMBER_TX if v == 0.5 else RED_TX)
+            ann.append(dict(x=j, y=i, text=sym, showarrow=False, font=dict(color=col, size=12)))
+    fig.update_layout(**light_layout(height=440), annotations=ann,
+                      xaxis=dict(tickangle=-35, side="bottom", tickfont=dict(color=MUTE, size=10)),
+                      yaxis=dict(tickfont=dict(color=MUTE, size=11)))
+    st.plotly_chart(fig, use_container_width=True, config=PLOT_CONFIG)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    st.markdown('<div style="height:16px"></div><div class="panel"><h3>Version notes</h3>', unsafe_allow_html=True)
+    badge = {"v1": (ACCENT_SOFT, MUTE), "v2": (ACCENT_SOFT, BODY), "v3": (GREEN_BG, GREEN_TX)}
+    for v, note in VERSION_NOTES.items():
+        bg, tx = badge[v]
+        st.markdown(
+            f'<div class="listrow"><div><span class="badge" style="background:{bg};color:{tx}">{v}</span>'
+            f'<span class="d" style="margin-top:6px">{note}</span></div></div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div></div>", unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: Personality / Evaluator / Runs (simple list pages)
+# ════════════════════════════════════════════════════════════════════════════
+def page_personality() -> None:
+    items = PERSONAS if HAS_SIM else []
+    st.markdown('<div class="page"><div class="sectitle">Caller personas</div>', unsafe_allow_html=True)
+    for i, p in enumerate(items, 1):
+        st.markdown(
+            f'<div class="listrow"><div><div class="t">{p}</div>'
+            f'<div class="d">Synthetic caller · used across simulation runs</div></div>'
+            f'<span class="tag">persona {i:02d}</span></div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def page_evaluator() -> None:
+    items = EVALUATORS if HAS_SIM else []
+    st.markdown('<div class="page"><div class="sectitle">Evaluators</div>', unsafe_allow_html=True)
+    for ev in items:
+        st.markdown(
+            f'<div class="listrow"><div><div class="t">{ev}</div>'
+            f'<div class="d">Pass / partial / fail · graded on every call</div></div>'
+            f'<span class="badge" style="background:{GREEN_BG};color:{GREEN_TX}">active</span></div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+def page_runs() -> None:
+    runs = [
+        ("run_0188", "Nov 4 · 2:10 PM", "v3", "89%", "Qualified", "Completed"),
+        ("run_0187", "Nov 3 · 6:42 PM", "v3", "88%", "Mixed", "Completed"),
+        ("run_0181", "Nov 2 · 11:05 AM", "v2", "77%", "Mixed", "Completed"),
+        ("run_0166", "Oct 30 · 9:20 AM", "v1", "62%", "Baseline", "Completed"),
+    ]
+    rows = "".join(
+        f"""<tr><td><span class="cell-id"><span>{r[0]}</span></span></td><td>{r[1]}</td>
+        <td><span class="vbadge">{r[2]}</span></td><td><span class="score" style="color:{GREEN_TX}">{r[3]}</span></td>
+        <td>{r[4]}</td><td>{disposition_badge('Qualified') if r[5]=='Completed' else r[5]}</td></tr>"""
+        for r in runs
+    )
+    st.markdown(
+        f"""
+<div class="page"><div class="sectitle">Simulation runs</div>
+  <div class="tbl-wrap"><table class="dt">
+    <thead><tr><th>Run ID</th><th>Started</th><th>Version</th><th>Score</th><th>Outcome</th><th>Status</th></tr></thead>
+    <tbody>{rows}</tbody>
+  </table></div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def page_labs() -> None:
+    _init_state()
+    lab_ids = st.session_state.lab_ids
+    all_calls = get_calls()
+    if lab_ids:
+        calls = [c for c in all_calls if c.call_id in lab_ids]
+        note = "Calls you staged from the Calls table. They become regression tests against future prompt versions."
+    else:
+        calls = [c for c in all_calls if c.disposition != "Qualified"][:4]
+        note = "Example staged calls. Use the row menu on the Calls page to add your own."
+    st.markdown(f'<div class="page"><div class="sectitle">Labs — staged for replay</div>'
+                f'<p class="cap" style="margin-bottom:16px">{note}</p>',
+                unsafe_allow_html=True)
+    for c in calls:
+        st.markdown(
+            f'<div class="listrow"><div><div class="t">{c.caller} · {c.case_type}</div>'
+            f'<div class="d">{c.call_id} · {c.summary}</div></div>{disposition_badge(c.disposition)}</div>',
+            unsafe_allow_html=True,
+        )
+    st.markdown("</div>", unsafe_allow_html=True)
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# PAGE: Home / Agent Settings
+# ════════════════════════════════════════════════════════════════════════════
+def page_home() -> None:
+    today = get_today()
+    week = get_week()
+    pipeline = estimated_pipeline(week.qualified_leads)
+    st.markdown(
+        f"""
+<div class="page">
+  <div class="panel" style="margin-bottom:18px;background:linear-gradient(180deg,#fafafa,#ffffff);border-color:{HAIRLINE}">
+    <div class="eyebrow">Welcome back</div>
+    <h3 style="font-size:22px">{AGENT_NAME} handled {today.total_calls} calls today</h3>
+    <p class="cap">{today.qualified} qualified · {today.after_hours_calls} after-hours · {format_currency(pipeline)} in estimated weekly pipeline.
+    Running {AGENT_VERSION} on {AGENT_PROVIDER}.</p>
+  </div>
+  <div class="kpis">
+    <div class="kpi"><div class="lbl">Calls today</div><div class="val">{today.total_calls}</div></div>
+    <div class="kpi"><div class="lbl">Qualified</div><div class="val accent">{today.qualified}</div></div>
+    <div class="kpi"><div class="lbl">After-hours</div><div class="val">{today.after_hours_calls}</div></div>
+    <div class="kpi"><div class="lbl">Weekly qualified</div><div class="val accent">{week.qualified_leads}</div></div>
+    <div class="kpi"><div class="lbl">Est. pipeline</div><div class="val">{format_currency(pipeline)}</div></div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def page_agent() -> None:
+    rows = [
+        ("Agent name", AGENT_NAME),
+        ("Firm", f"{FIRM_NAME} — {FIRM_TAGLINE}"),
+        ("Active version", AGENT_VERSION),
+        ("Orchestration", "Pipecat Cloud"),
+        ("LLM", "NVIDIA Nemotron 3 Super 120B"),
+        ("Speech-to-text", "Nemotron Speech Streaming"),
+        ("Text-to-speech", "Gradium"),
+        ("Telephony", "Twilio (after-hours overflow + dedicated line)"),
+        ("Languages", "English, Spanish (bilingual handoff)"),
+        ("Practice area", "Personal injury — auto, slip & fall, dog bite, motorcycle"),
+        ("Qualification policy", "Injury + treatment + within SoL + not represented"),
+    ]
+    kv = "".join(f'<div class="k">{k}</div><div class="v">{v}</div>' for k, v in rows)
+    st.markdown(
+        f"""
+<div class="page">
+  <div class="panel">
+    <div class="eyebrow">Configuration</div>
+    <h3>Agent settings</h3>
+    <p class="cap" style="margin-bottom:10px">Read-only summary of the deployed intake agent.</p>
+    <div class="kv">{kv}</div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+# ── Router ───────────────────────────────────────────────────────────────────
+render_sidebar()
+topbar()
+
+ROUTES = {
+    "home": page_home,
+    "agent": page_agent,
+    "metrics": page_metrics,
+    "labs": page_labs,
+    "personality": page_personality,
+    "evaluator": page_evaluator,
+    "results": page_results,
+    "runs": page_runs,
+    "calls": page_calls,
+    "overview": page_overview,
+}
+ROUTES.get(PAGE, page_calls)()
