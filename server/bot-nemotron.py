@@ -607,6 +607,16 @@ async def run_bot(
         ]
     )
 
+    # --- Language configuration ----------------------------------------------
+    # AGENT_LANGUAGE: BCP-47 code (e.g. "en-US", "es-US", "fr-FR", "de-DE",
+    #   "it-IT", "hi-IN", "ja-JP") to run the whole pipeline in one language, OR
+    #   "multi" to let the caller speak ANY supported language (STT auto-detects;
+    #   the LLM mirrors it). Supported by all three NVIDIA models:
+    #   Parakeet-multilingual STT, Nemotron LLM, Magpie multilingual TTS.
+    agent_language = os.getenv("AGENT_LANGUAGE", "en-US")
+    multilingual = agent_language.lower() == "multi"
+    logger.info("[LANG] agent_language={} multilingual={}", agent_language, multilingual)
+
     # --- System instruction --------------------------------------------------
     # The persona + intake flow + tool/decision logic lives in
     # prompts/master_prompt.md (Aria, Hartley & Associates legal intake). We load
@@ -617,6 +627,20 @@ async def run_bot(
         f"Today is {date.today().strftime('%A, %B %d, %Y')}. Use this to resolve "
         'relative dates the caller mentions (e.g. "last Tuesday", "about three months ago").'
     )
+    if multilingual:
+        system_instruction += (
+            "\n\n# Language\n"
+            "The caller may speak ANY language. From their first words, detect the "
+            "language they are using and conduct the ENTIRE conversation in that same "
+            "language — every question, every script, and the closing. Mirror the "
+            "caller's language naturally and never switch languages unless they do."
+        )
+    elif not agent_language.lower().startswith("en"):
+        system_instruction += (
+            f"\n\n# Language\nConduct the ENTIRE conversation in {agent_language} — "
+            "every question, script, and the closing. The caller is speaking this "
+            "language; do not reply in English."
+        )
     logger.info("[PROMPT] system_instruction preview: {}", system_instruction[:400].replace("\n", " "))
 
     # Speech-to-Text service
@@ -654,19 +678,54 @@ async def run_bot(
         from pipecat.services.nvidia.stt import NvidiaSTTService
 
         stt_server = os.getenv("NVIDIA_STT_SERVER", "grpc.nvcf.nvidia.com:443")
-        logger.info("STT provider: NVIDIA Parakeet NIM (server={})", stt_server)
-        stt = NvidiaSTTService(
-            api_key=os.getenv("NVIDIA_API_KEY") or os.environ["NEMOTRON_LLM_API_KEY"],
-            server=stt_server,
-            use_ssl=os.getenv("NVIDIA_STT_USE_SSL", "true").lower() == "true",
-            sample_rate=16000,  # Parakeet expects 16 kHz; pipecat upsamples Twilio's 8 kHz
-            model_function_map={
-                "function_id": os.getenv(
-                    "PARAKEET_FUNCTION_ID", "bb0837de-8c7b-481f-9ec8-ef5663e9c1fa"
-                ),
-                "model_name": os.getenv("PARAKEET_MODEL", "nemotron-asr-streaming"),
-            },
-        )
+        stt_api_key = os.getenv("NVIDIA_API_KEY") or os.environ["NEMOTRON_LLM_API_KEY"]
+        stt_use_ssl = os.getenv("NVIDIA_STT_USE_SSL", "true").lower() == "true"
+        # The default nemotron-asr-streaming NIM is English-only. For "multi" or
+        # any non-English language we use parakeet-1.1b-rnnt-multilingual, which
+        # auto-detects with language_code="multi" or transcribes a specific code
+        # (verified: en/es/fr). English stays on the dedicated nemotron NIM.
+        english_only = (not multilingual) and agent_language.lower().startswith("en")
+        if english_only:
+            logger.info("STT provider: NVIDIA Parakeet NIM (en-US, server={})", stt_server)
+            stt = NvidiaSTTService(
+                api_key=stt_api_key,
+                server=stt_server,
+                use_ssl=stt_use_ssl,
+                sample_rate=16000,  # Parakeet expects 16 kHz; pipecat upsamples Twilio's 8 kHz
+                model_function_map={
+                    "function_id": os.getenv(
+                        "PARAKEET_FUNCTION_ID", "bb0837de-8c7b-481f-9ec8-ef5663e9c1fa"
+                    ),
+                    "model_name": os.getenv("PARAKEET_MODEL", "nemotron-asr-streaming"),
+                },
+            )
+        else:
+            # "multi" auto-detects any language; otherwise force the specific code.
+            lang_code = "multi" if multilingual else agent_language
+
+            class _MultilingualParakeetSTT(NvidiaSTTService):
+                def _create_recognition_config(self):
+                    cfg = super()._create_recognition_config()
+                    cfg.config.language_code = lang_code
+                    return cfg
+
+            logger.info(
+                "STT provider: NVIDIA Parakeet-multilingual NIM (language_code={})", lang_code
+            )
+            stt = _MultilingualParakeetSTT(
+                api_key=stt_api_key,
+                server=stt_server,
+                use_ssl=stt_use_ssl,
+                sample_rate=16000,
+                model_function_map={
+                    "function_id": os.getenv(
+                        "PARAKEET_ML_FUNCTION_ID", "71203149-d3b7-4460-8231-1be2543a1fca"
+                    ),
+                    "model_name": os.getenv(
+                        "PARAKEET_ML_MODEL", "parakeet-1.1b-rnnt-multilingual"
+                    ),
+                },
+            )
 
     # LLM service — Nemotron-3-Super-120B served by vLLM (OpenAI-compatible chat
     # completions at /v1). vLLM exposes the Chat Completions API, not the Responses
@@ -735,9 +794,28 @@ async def run_bot(
     else:
         from pipecat.services.nvidia.tts import NvidiaTTSService
 
-        magpie_voice = os.getenv("MAGPIE_VOICE", "Magpie-Multilingual.EN-US.Aria")
+        # Magpie multilingual: one voice covers en/es/fr/de/zh/vi/it/hi/ja; the
+        # spoken language is chosen by the request's language_code. A specific
+        # AGENT_LANGUAGE drives it directly. In "multi" mode Magpie can't be
+        # auto-switched per turn (pipecat doesn't surface STT's detected
+        # language), so it synthesizes in MAGPIE_LANGUAGE (default en-US) — set
+        # that to the caller's language for a single-language demo.
+        magpie_lang = os.getenv("MAGPIE_LANGUAGE", "en-US") if multilingual else agent_language
+        # The .EN-US.Aria voice is warm for English; for other languages use the
+        # base multilingual voice so the language_code drives pronunciation.
+        default_voice = (
+            "Magpie-Multilingual.EN-US.Aria"
+            if magpie_lang.lower().startswith("en")
+            else "Magpie-Multilingual"
+        )
+        magpie_voice = os.getenv("MAGPIE_VOICE", default_voice)
         magpie_server = os.getenv("NVIDIA_TTS_SERVER", "grpc.nvcf.nvidia.com:443")
-        logger.info("TTS provider: NVIDIA Magpie (voice={}, server={})", magpie_voice, magpie_server)
+        logger.info(
+            "TTS provider: NVIDIA Magpie (voice={}, lang={}, server={})",
+            magpie_voice,
+            magpie_lang,
+            magpie_server,
+        )
         tts = NvidiaTTSService(
             api_key=os.getenv("NVIDIA_API_KEY") or os.environ["NEMOTRON_LLM_API_KEY"],
             server=magpie_server,
@@ -748,7 +826,7 @@ async def run_bot(
                 ),
                 "model_name": os.getenv("MAGPIE_MODEL", "magpie-tts-multilingual"),
             },
-            settings=NvidiaTTSService.Settings(voice=magpie_voice),
+            settings=NvidiaTTSService.Settings(voice=magpie_voice, language=Language(magpie_lang)),
         )
 
     # ToolsSchema (above) describes the tools to the LLM; register_function wires
@@ -898,9 +976,14 @@ async def bot(runner_args: RunnerArguments):
                 ),
             )
         case WebSocketRunnerArguments():
-            # Twilio media streams are 8 kHz μ-law in both directions.
-            # This overrides the default sample rates: 16 kHz in / 24 kHz out.
-            transport_overrides["audio_in_sample_rate"] = 8000
+            # Twilio media streams are 8 kHz μ-law on the wire. We keep OUTPUT at
+            # 8 kHz (the serializer re-encodes to μ-law for Twilio), but run INPUT
+            # at 16 kHz: the TwilioFrameSerializer upsamples the incoming 8 kHz
+            # μ-law to 16 kHz PCM (ulaw_to_pcm -> pipeline rate), so VAD and the
+            # Parakeet NIM STT receive TRUE 16 kHz audio. Parakeet is configured
+            # for 16 kHz; feeding it 8 kHz frames mislabeled as 16 kHz produced
+            # empty transcripts ("greets but never replies"). 16 kHz in fixes that.
+            transport_overrides["audio_in_sample_rate"] = 16000
             transport_overrides["audio_out_sample_rate"] = 8000
 
             # Parse Twilio websocket and fetch call information
