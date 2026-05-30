@@ -1,30 +1,15 @@
-"""
-Table of Contents:
- * # Custom Voices per Agent
- * ## Overview
- * ## Configuration
- * ## Dynamic Voice Switching
- * ## Benefits
-"""
+# Brief Overview
 
-# Custom Voices per Agent
+**Original Link:** https://docs.pipecat.ai/subagents/learn/custom-voices-per-agent
 
-Pipecat subagents can each have their own unique voice settings.
+## Table of Contents
 
-## Overview
+  - Configuration
 
-Giving different agents distinct voices helps users distinguish between them and enhances the conversational experience. For example, a "Billing Specialist" might have a different voice than a "Technical Support" agent.
+---
+
+Each subagent in a Pipecat application can have its own unique voice. This helps users distinguish between different agents and creates a more immersive experience.
 
 ## Configuration
 
-Each subagent's `TTSService` can be configured independently with its own voice ID, provider, and settings.
-
-## Dynamic Voice Switching
-
-When a handover occurs, the voice automatically changes to the one configured for the active agent.
-
-## Benefits
-
-* **Improved User Experience**: Clearer distinction between different agent roles.
-* **Branding**: Use specific voices for different parts of your service.
-* **Accessibility**: Choose voices that are most appropriate for the task at hand.
+You can specify the voice for each agent in its configuration settings. This is typically done when initializing the TTS service for that agent.

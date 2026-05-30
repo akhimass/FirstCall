@@ -1,29 +1,18 @@
-"""
-Table of Contents:
- * # Accounts and Organizations
- * ## Overview
- * ## Accounts
- * ## Organizations
- * ## Roles and Permissions
-"""
+# Brief Overview
 
-# Accounts and Organizations
+**Original Link:** https://docs.pipecat.ai/pipecat-cloud/fundamentals/accounts-and-organizations
 
-How users and teams are managed in Pipecat Cloud.
+## Table of Contents
 
-## Overview
+  - Authentication
+  - Organizations
 
-Pipecat Cloud uses a hierarchical structure of accounts and organizations to manage access and resources.
+---
 
-## Accounts
+Pipecat Cloud accounts are issued a personal workspace where you can deploy agents independently. User workspaces are unique and isolated from one another, making them unsuitable for collaboration.
 
-A user account represents an individual developer. It's used for authentication and personal projects.
+## Authentication
+Before you can issue any commands via the CLI, you must authenticate with your Pipecat Cloud account.
 
 ## Organizations
-
-An organization is a shared workspace for teams. It allows multiple users to collaborate on projects, share secrets, and manage billing together.
-
-## Roles and Permissions
-
-Within an organization, users can be assigned different roles (e.g., Owner, Admin, Developer) with varying levels of access to resources.
-"""
+Working as part of a team requires creating an organization. Organizations are multi-tenant workspaces that enable collaboration on deployments.
