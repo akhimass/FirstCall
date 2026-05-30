@@ -257,7 +257,13 @@ async def run_bot(
             messages = None
         transcript = build_transcript(messages)
         try:
-            await asyncio.to_thread(finalize_session, intake_state, transcript)
+            await asyncio.to_thread(
+                finalize_session,
+                intake_state,
+                transcript,
+                messages=messages,
+                call_ended_reason=reason,
+            )
         except Exception as e:
             logger.error("[POSTCALL] finalize failed: {!r}", e)
 

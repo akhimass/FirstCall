@@ -30,6 +30,7 @@ except ImportError:  # pragma: no cover - allows test/import environments withou
 
     logger = logging.getLogger(__name__)
 
+from tools.cekura_observe import send_call_to_cekura
 from tools.post_call_queue import build_standard_queue
 from tools.s3_logger import log_session
 
@@ -231,15 +232,23 @@ def build_transcript(messages: list[dict[str, Any]] | None) -> str:
     return "\n".join(lines)
 
 
-def finalize_session(intake_state: dict[str, Any], transcript: str) -> dict[str, Any]:
+def finalize_session(
+    intake_state: dict[str, Any],
+    transcript: str,
+    *,
+    messages: list[dict[str, Any]] | None = None,
+    call_ended_reason: str = "completed",
+) -> dict[str, Any]:
     """Build the follow-up queue and persist intake + transcript + queue to S3.
 
     Synchronous (boto3 is blocking) — call via a thread executor from async code.
     Degrades gracefully: if INTAKE_S3_BUCKET is unset or boto3/credentials are
     missing, the queue is still built and logged; only the upload is skipped.
+    When ``CEKURA_API_KEY`` and ``CEKURA_AGENT_ID`` are set, also sends the call
+    to Cekura Observability.
 
     Returns:
-        {"queue": <queue_dict>, "s3": <log_session result or None>}.
+        {"queue": <queue_dict>, "s3": <log_session result or None>, "cekura": ...}.
     """
     session_id = intake_state.get("session_id") or "unknown-session"
     queue_data = build_queue_dict(intake_state)
@@ -256,12 +265,24 @@ def finalize_session(intake_state: dict[str, Any], transcript: str) -> dict[str,
     for task in queue_data["tasks"]:
         logger.info("[POSTCALL]   queued: {} [{}]", task["task_type"], task["priority"])
 
+    cekura_result = send_call_to_cekura(
+        intake_state=intake_state,
+        messages=messages,
+        call_ended_reason=call_ended_reason,
+    )
+    if cekura_result is None:
+        logger.info("[CEKURA] CEKURA_API_KEY/CEKURA_AGENT_ID not set — observability skipped.")
+    elif cekura_result.get("status") == "error":
+        logger.error("[CEKURA] observability upload failed: {}", cekura_result)
+    else:
+        logger.info("[CEKURA] observability upload result: {}", cekura_result)
+
     bucket = os.getenv("INTAKE_S3_BUCKET")
     if not bucket:
         logger.warning(
             "[POSTCALL] INTAKE_S3_BUCKET not set — queue built and logged, S3 upload skipped."
         )
-        return {"queue": queue_data, "s3": None}
+        return {"queue": queue_data, "s3": None, "cekura": cekura_result}
 
     s3_result = log_session(
         bucket_name=bucket,
@@ -274,4 +295,4 @@ def finalize_session(intake_state: dict[str, Any], transcript: str) -> dict[str,
         logger.info("[POSTCALL] ✓ S3 upload ok: {}", s3_result)
     else:
         logger.error("[POSTCALL] ✖ S3 upload failed: {}", s3_result)
-    return {"queue": queue_data, "s3": s3_result}
+    return {"queue": queue_data, "s3": s3_result, "cekura": cekura_result}
