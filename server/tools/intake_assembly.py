@@ -268,6 +268,7 @@ def finalize_session(
     cekura_result = send_call_to_cekura(
         intake_state=intake_state,
         messages=messages,
+        transcript=transcript,
         call_ended_reason=call_ended_reason,
     )
     if cekura_result is None:

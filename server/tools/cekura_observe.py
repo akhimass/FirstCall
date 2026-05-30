@@ -18,6 +18,40 @@ CEKURA_OBSERVE_URL = "https://api.cekura.ai/observability/v1/observe/"
 _GREETING_TRIGGER_MARKER = "The caller has just connected"
 
 
+def build_cekura_transcript_from_plain(transcript: str) -> list[dict[str, Any]]:
+    """Parse ``build_transcript()`` plain text into Cekura transcript entries."""
+
+    turns: list[dict[str, Any]] = []
+    clock = 0.0
+    for line in transcript.splitlines():
+        text = line.strip()
+        if not text:
+            continue
+        if text.startswith("Caller: "):
+            role = "Testing Agent"
+            content = text[len("Caller: ") :].strip()
+        elif text.startswith("Aria: "):
+            role = "Main Agent"
+            content = text[len("Aria: ") :].strip()
+        else:
+            continue
+        if not content:
+            continue
+        duration = max(1.0, min(len(content.split()) * 0.35, 30.0))
+        start = clock
+        end = clock + duration
+        clock = end + 0.2
+        turns.append(
+            {
+                "role": role,
+                "content": content,
+                "start_time": round(start, 2),
+                "end_time": round(end, 2),
+            }
+        )
+    return turns
+
+
 def build_cekura_transcript_json(messages: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     """Convert LLM context messages to Cekura ``transcript_json`` entries."""
 
@@ -57,6 +91,7 @@ def send_call_to_cekura(
     *,
     intake_state: dict[str, Any],
     messages: list[dict[str, Any]] | None,
+    transcript: str | None = None,
     call_ended_reason: str = "completed",
 ) -> dict[str, Any] | None:
     """POST a completed call to Cekura Observability.
@@ -77,6 +112,8 @@ def send_call_to_cekura(
         return {"status": "error", "error": "invalid CEKURA_AGENT_ID"}
 
     transcript_json = build_cekura_transcript_json(messages)
+    if not transcript_json and transcript:
+        transcript_json = build_cekura_transcript_from_plain(transcript)
     if not transcript_json:
         logger.warning("[CEKURA] empty transcript — skipping observability upload")
         return {"status": "skipped", "reason": "empty transcript"}

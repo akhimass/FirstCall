@@ -23,6 +23,16 @@ def test_build_cekura_transcript_json_maps_roles_and_skips_greeting_trigger():
     assert turns[1]["start_time"] < turns[1]["end_time"]
 
 
+def test_build_cekura_transcript_from_plain_parses_caller_and_aria_lines():
+    plain = "Caller: I was in a crash.\nAria: I am sorry to hear that."
+
+    turns = co.build_cekura_transcript_from_plain(plain)
+
+    assert len(turns) == 2
+    assert turns[0]["role"] == "Testing Agent"
+    assert turns[1]["role"] == "Main Agent"
+
+
 def test_send_call_to_cekura_noops_without_credentials(monkeypatch):
     monkeypatch.delenv("CEKURA_API_KEY", raising=False)
     monkeypatch.delenv("CEKURA_AGENT_ID", raising=False)
