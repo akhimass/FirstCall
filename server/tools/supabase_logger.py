@@ -86,6 +86,7 @@ def record_call_to_supabase(
         "p_tasks": (queue_dict or {}).get("tasks", []),
         "p_call_ended_reason": call_ended_reason,
         "p_s3": _s3_keys(s3_keys),
+        "p_firm_phone": intake_state.get("firm_phone") or os.getenv("TWILIO_PHONE_NUMBER"),
     }
     try:
         resp = client.rpc("record_call", args).execute()

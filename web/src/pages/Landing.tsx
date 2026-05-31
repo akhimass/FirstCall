@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom"
 import { Button } from "@/components/ui/button"
 import { Wordmark } from "@/components/Logo"
-import { FIRM_NAME, AGENT_NAME } from "@/lib/mock"
+import { FIRM_NAME, FIRM_TAGLINE, AGENT_NAME } from "@/lib/mock"
 
 export default function Landing() {
   return (
@@ -15,19 +15,15 @@ export default function Landing() {
         </div>
       </header>
       <main className="mx-auto max-w-5xl px-6 py-20">
-        <h1 className="text-4xl font-semibold tracking-tight">
-          {FIRM_NAME} intake console
-        </h1>
+        <p className="text-sm font-medium text-muted-foreground">{FIRM_TAGLINE}</p>
+        <h1 className="mt-2 text-4xl font-semibold tracking-tight">{FIRM_NAME}</h1>
         <p className="mt-4 max-w-xl text-lg text-muted-foreground">
           {AGENT_NAME} answers +1 (385) 363-4730, screens callers, and logs every tool call.
-          Sign in to view live calls and technical telemetry.
+          Sign in with your firm credentials to open the dashboard.
         </p>
-        <div className="mt-8 flex gap-3">
+        <div className="mt-8">
           <Button asChild size="lg">
-            <Link to="/signin">Open dashboard</Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link to="/app/live">Live view</Link>
+            <Link to="/signin">Sign in</Link>
           </Button>
         </div>
       </main>

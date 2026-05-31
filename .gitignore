@@ -216,11 +216,16 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
+.DS_Store
+
 # Web app (Vite / Vercel)
 web/node_modules/
 web/.vercel/
 web/.vite/
 web/.env
+
+# Local agent runtime artifacts
+server/runtime/
 
 # Local reference checkout of pipecat source (read-only; runtime uses the
 # installed pipecat-ai package). It's a separate 182MB embedded git repo.

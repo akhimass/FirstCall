@@ -26,13 +26,13 @@ export default function SignIn() {
       setError(error)
       return
     }
-    navigate("/app/live", { replace: true })
+    navigate("/app/overview", { replace: true })
   }
 
   return (
     <AuthLayout
-      title={`${FIRM_NAME} console`}
-      subtitle="Sign in to review live intake calls and tool telemetry."
+      title="Sign in"
+      subtitle={`${FIRM_NAME} team members only.`}
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">

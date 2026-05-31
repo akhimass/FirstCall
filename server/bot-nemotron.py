@@ -209,6 +209,7 @@ async def get_call_info(call_sid: str) -> dict:
 async def run_bot(
     transport: BaseTransport,
     from_number: str | None = None,
+    to_number: str | None = None,
     session_id: str | None = None,
     audio_in_sample_rate: int = 16000,
     audio_out_sample_rate: int = 24000,
@@ -218,6 +219,7 @@ async def run_bot(
     Args:
         transport: The transport to use.
         from_number: Caller's phone number (Twilio path only) for known-customer lookup.
+        to_number: Firm's Twilio line that received the call (Twilio path only).
         session_id: Unique session identifier (Twilio call SID, or generated).
         audio_in_sample_rate: Input audio sample rate in Hz. Defaults to 16000 (WebRTC).
         audio_out_sample_rate: Output audio sample rate in Hz. Defaults to 24000 (WebRTC).
@@ -234,7 +236,15 @@ async def run_bot(
     # on call end we build the follow-up queue and log intake + transcript + queue
     # to S3 (see tools/intake_assembly.py). Closed over by the tools and handlers.
     intake_state = new_intake_state(caller_phone=from_number, session_id=session_id)
-    logger.info("[POSTCALL] session_id={} caller_phone={}", intake_state["session_id"], from_number)
+    firm_phone = to_number or os.getenv("TWILIO_PHONE_NUMBER")
+    if firm_phone:
+        intake_state["firm_phone"] = firm_phone
+    logger.info(
+        "[POSTCALL] session_id={} caller_phone={} firm_phone={}",
+        intake_state["session_id"],
+        from_number,
+        firm_phone,
+    )
     _finalized = {"done": False}
 
     # Per-call order state (legacy flower tools, unused by the legal-intake flow).
@@ -868,20 +878,19 @@ async def run_bot(
     #   VAD_CONFIDENCE — speech-probability threshold. Raised to 0.7 (default 0.5) to
     #     suppress false interrupt triggers from Krisp/Twilio line noise now that
     #     interruptions are re-enabled (see ALLOW_INTERRUPTIONS below).
-    # Noise robustness (env-tunable): a loud demo room was tripping VAD on
-    # background chatter, firing spurious "user started speaking" -> interruption
-    # that cut the bot off mid-sentence. Defaults below gate that out:
-    #   VAD_CONFIDENCE — speech-probability threshold (0.8: ignore low-prob noise).
-    #   VAD_MIN_VOLUME — audio must be at least this loud to count as speech
-    #     (0.8: ignores far-field room chatter; the caller's own voice is louder).
-    #   VAD_START_SECS — require sustained speech before triggering (0.2: ignore
-    #     short noise blips like a cough/door/clap).
+    # Noise robustness (env-tunable). Phone callers are much quieter than an
+    # in-room mic — min_volume=0.8 caused missed answers (e.g. "Florida") and
+    # 20–30s dead air before STT ever ran. Defaults below balance phone pickup
+    # vs. room noise:
+    #   VAD_CONFIDENCE — speech-probability threshold.
+    #   VAD_MIN_VOLUME — minimum loudness to count as speech (0.55 for Twilio).
+    #   VAD_START_SECS — sustained speech before triggering (ignore blips).
     #   VAD_STOP_SECS  — silence after speech before the turn ends.
     vad_params = VADParams(
-        confidence=float(os.getenv("VAD_CONFIDENCE", "0.8")),
+        confidence=float(os.getenv("VAD_CONFIDENCE", "0.7")),
         start_secs=float(os.getenv("VAD_START_SECS", "0.2")),
         stop_secs=float(os.getenv("VAD_STOP_SECS", "0.6")),
-        min_volume=float(os.getenv("VAD_MIN_VOLUME", "0.8")),
+        min_volume=float(os.getenv("VAD_MIN_VOLUME", "0.55")),
     )
     logger.info(
         "[VAD] confidence={} min_volume={} start_secs={} stop_secs={}",
@@ -999,6 +1008,7 @@ async def bot(runner_args: RunnerArguments):
     """Main bot entry point."""
 
     from_number: str | None = None
+    to_number: str | None = None
     session_id: str | None = None
     transport_overrides: dict = {}
 
@@ -1043,7 +1053,8 @@ async def bot(runner_args: RunnerArguments):
             call_info = await get_call_info(call_data["call_id"])
             if call_info:
                 from_number = call_info.get("from_number")
-                logger.info(f"Call from: {from_number} to: {call_info.get('to_number')}")
+                to_number = call_info.get("to_number")
+                logger.info(f"Call from: {from_number} to: {to_number}")
 
             serializer = TwilioFrameSerializer(
                 stream_sid=call_data["stream_id"],
@@ -1067,7 +1078,11 @@ async def bot(runner_args: RunnerArguments):
             return
 
     await run_bot(
-        transport, from_number=from_number, session_id=session_id, **transport_overrides
+        transport,
+        from_number=from_number,
+        to_number=to_number,
+        session_id=session_id,
+        **transport_overrides,
     )
 
 

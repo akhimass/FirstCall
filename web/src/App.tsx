@@ -18,7 +18,7 @@ function Protected({ children }: { children: ReactNode }) {
 function PublicOnly({ children }: { children: ReactNode }) {
   const { ready, authed } = useAuth()
   if (!ready) return null
-  if (authed) return <Navigate to="/app/live" replace />
+  if (authed) return <Navigate to="/app/overview" replace />
   return <>{children}</>
 }
 
@@ -43,7 +43,7 @@ export default function App() {
           </Protected>
         }
       >
-        <Route index element={<Navigate to="/app/live" replace />} />
+        <Route index element={<Navigate to="/app/overview" replace />} />
         <Route path="overview" element={<Overview />} />
         <Route path="calls" element={<Calls />} />
         <Route path="live" element={<Live />} />
