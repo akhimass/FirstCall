@@ -1,8 +1,10 @@
 name: Deploy Web to Vercel
 
-# Optional: use this if you deploy via GitHub Actions + deploy hook token.
-# For native Vercel Git deploys (akhimass-projects/firstcall), Vercel handles
-# pushes automatically — you can disable or delete this workflow.
+# Production URL: https://firstcalllaw.vercel.app/
+# Project: https://vercel.com/akhimass-projects/firstcall
+#
+# Preferred: connect Git on that Vercel project (root directory: web).
+# This workflow only runs when akhimass-projects IDs are set in GitHub secrets.
 
 on:
   push:
@@ -18,10 +20,11 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ secrets.VERCEL_ORG_ID != '' && secrets.VERCEL_PROJECT_ID != '' }}
     runs-on: ubuntu-latest
     env:
-      VERCEL_ORG_ID: team_4aP0zGgwfcWsbVFqmBSTZ7SY
-      VERCEL_PROJECT_ID: prj_R0duOQlulhksnG5FZlXnv0j5zG4R
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
     defaults:
       run:
         working-directory: web
@@ -35,5 +38,5 @@ jobs:
       - name: Pull Vercel project settings
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
-      - name: Deploy from GitHub
+      - name: Deploy to firstcalllaw
         run: vercel deploy --prod --token=${{ secrets.VERCEL_TOKEN }} --yes
