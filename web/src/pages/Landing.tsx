@@ -8,7 +8,7 @@ import {
   Phone,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Wordmark } from "@/components/Logo"
+import { Wordmark, BrandLogoFull } from "@/components/Logo"
 import { AGENT_NAME } from "@/lib/mock"
 
 const FEATURES = [
@@ -64,7 +64,7 @@ export default function Landing() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
-          <Wordmark />
+          <Wordmark showTagline />
           <nav className="hidden items-center gap-6 text-sm text-muted-foreground md:flex">
             <a href="#features" className="hover:text-foreground">
               Features
@@ -94,9 +94,7 @@ export default function Landing() {
               <span className="size-2 rounded-full bg-emerald-500" />
               Now answering in 25+ languages · 24/7
             </div>
-            <h1 className="text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl">
-              FirstCall
-            </h1>
+            <BrandLogoFull className="mx-auto max-w-[280px] md:max-w-[320px]" />
             <p className="mt-5 text-lg text-muted-foreground md:text-xl">
               {AGENT_NAME} answers +1 (385) 363-4730, screens callers, and logs every tool call.
               Qualifies the lead, checks the statute of limitations, and books the consult — so your
@@ -297,7 +295,7 @@ export default function Landing() {
 
       <footer className="border-t border-border">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8">
-          <Wordmark />
+          <Wordmark showTagline />
           <p className="text-sm text-muted-foreground">
             © 2026 FirstCall AI · Built on Pipecat &amp; NVIDIA Nemotron
           </p>

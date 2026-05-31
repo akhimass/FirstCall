@@ -1,39 +1,47 @@
 import { cn } from "@/lib/utils"
 
+/** Black square mark — scales + signal (header / sidebar). */
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <span
-      className={cn(
-        "inline-flex size-7 items-center justify-center rounded-md bg-primary text-primary-foreground",
-        className
-      )}
-    >
-      <svg viewBox="0 0 24 24" fill="none" className="size-4">
-        <path
-          d="M12 3l7 3v5c0 4.2-2.8 7.6-7 9-4.2-1.4-7-4.8-7-9V6l7-3z"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-        <path
-          d="M9 12l2 2 4-4"
-          stroke="currentColor"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+    <img
+      src="/brand/header-icon.png"
+      alt=""
+      aria-hidden
+      className={cn("size-8 shrink-0 rounded-md object-cover", className)}
+    />
+  )
+}
+
+/** Compact wordmark for nav bars and auth screens. */
+export function Wordmark({
+  className,
+  showTagline = false,
+}: {
+  className?: string
+  showTagline?: boolean
+}) {
+  return (
+    <span className={cn("inline-flex items-center gap-2.5", className)}>
+      <LogoMark />
+      <span className="flex flex-col justify-center leading-none">
+        <span className="text-[1.05rem] font-bold tracking-tight lowercase">firstcall</span>
+        {showTagline && (
+          <span className="mt-1 text-[0.55rem] font-medium uppercase tracking-[0.32em] text-muted-foreground">
+            Law AI
+          </span>
+        )}
+      </span>
     </span>
   )
 }
 
-export function Wordmark({ className }: { className?: string }) {
+/** Full stacked logo for marketing hero and footer. */
+export function BrandLogoFull({ className }: { className?: string }) {
   return (
-    <span className={cn("flex items-center gap-2 font-semibold tracking-tight", className)}>
-      <LogoMark />
-      <span className="text-[1.05rem]">
-        First<span className="text-muted-foreground">Call</span>
-      </span>
-    </span>
+    <img
+      src="/brand/firstcall-logo-full.png"
+      alt="FirstCall Law AI"
+      className={cn("mx-auto h-auto w-full max-w-[220px] md:max-w-[260px]", className)}
+    />
   )
 }
