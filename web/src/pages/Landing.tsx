@@ -81,7 +81,7 @@ export default function Landing() {
               <Link to="/signin">Sign in</Link>
             </Button>
             <Button asChild>
-              <Link to="/signin">Get started</Link>
+              <Link to="/signup">Get started</Link>
             </Button>
           </div>
         </div>
@@ -287,7 +287,7 @@ export default function Landing() {
               missed call.
             </p>
             <Button asChild size="lg" className="mt-8">
-              <Link to="/signin">Create your workspace →</Link>
+              <Link to="/signup">Create your workspace →</Link>
             </Button>
           </div>
         </section>

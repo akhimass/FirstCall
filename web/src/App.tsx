@@ -3,6 +3,7 @@ import { Loader2 } from "lucide-react"
 import { useAuth } from "@/auth/AuthProvider"
 import Landing from "@/pages/Landing"
 import SignIn from "@/pages/SignIn"
+import SignUp from "@/pages/SignUp"
 import ConsoleLayout from "@/app/ConsoleLayout"
 import Overview from "@/app/Overview"
 import Calls from "@/app/Calls"
@@ -48,7 +49,14 @@ export default function App() {
             </PublicOnly>
           }
         />
-        <Route path="/signup" element={<Navigate to="/signin" replace />} />
+        <Route
+          path="/signup"
+          element={
+            <PublicOnly>
+              <SignUp />
+            </PublicOnly>
+          }
+        />
         <Route
           path="/app"
           element={

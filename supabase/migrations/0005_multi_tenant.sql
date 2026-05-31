@@ -21,6 +21,8 @@ $$;
 
 grant execute on function public.current_firm_phone() to authenticated;
 grant execute on function public.is_admin() to authenticated;
+revoke all on function public.current_firm_phone() from public, anon;
+revoke all on function public.is_admin() from public, anon;
 
 -- ---- replace the permissive read policies with firm-scoped ones ----------------
 -- calls: scoped by firm_phone
