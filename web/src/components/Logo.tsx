@@ -1,13 +1,13 @@
 import { cn } from "@/lib/utils"
 
-/** Black square mark — scales + signal. */
+/** Black square mark — white scales + signal line art. */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <img
       src="/brand/header-icon.png"
       alt=""
       aria-hidden
-      className={cn("size-8 shrink-0 rounded-md object-cover", className)}
+      className={cn("size-9 shrink-0 rounded-lg object-contain", className)}
     />
   )
 }
