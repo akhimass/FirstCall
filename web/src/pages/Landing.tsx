@@ -8,7 +8,7 @@ import {
   Phone,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Wordmark, BrandLogoFull } from "@/components/Logo"
+import { Wordmark, LogoMark } from "@/components/Logo"
 import { AGENT_NAME } from "@/lib/mock"
 
 const FEATURES = [
@@ -88,105 +88,107 @@ export default function Landing() {
       </header>
 
       <main>
-        <section className="mx-auto max-w-6xl px-6 pb-16 pt-16 md:pt-24">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-sm text-muted-foreground">
-              <span className="size-2 rounded-full bg-emerald-500" />
-              Now answering in 25+ languages · 24/7
-            </div>
-            <BrandLogoFull className="mx-auto max-w-[280px] md:max-w-[320px]" />
-            <p className="mt-5 text-lg text-muted-foreground md:text-xl">
-              {AGENT_NAME} answers +1 (385) 363-4730, screens callers, and logs every tool call.
-              Qualifies the lead, checks the statute of limitations, and books the consult — so your
-              firm only talks to cases worth taking.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Button asChild size="lg">
-                <Link to="/signin">Open dashboard</Link>
-              </Button>
-            </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              No credit card required · Live in under 10 minutes · Trusted by 200+ PI firms
-            </p>
-          </div>
-
-          <div className="mx-auto mt-14 max-w-4xl">
-            <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-              <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-3">
-                <span className="size-3 rounded-full bg-[#ff5f57]" />
-                <span className="size-3 rounded-full bg-[#febc2e]" />
-                <span className="size-3 rounded-full bg-[#28c840]" />
+        <section className="mx-auto max-w-6xl px-6 pb-16 pt-12 md:pt-20">
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
+            <div className="text-center lg:text-left">
+              <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-sm text-muted-foreground">
+                <span className="size-2 rounded-full bg-emerald-500" />
+                Now answering in 25+ languages · 24/7
               </div>
-              <div className="grid md:grid-cols-[200px_1fr]">
-                <aside className="hidden border-r border-border bg-muted/30 p-4 md:block">
-                  <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
-                    <span className="inline-flex size-6 items-center justify-center rounded-md bg-primary text-xs text-primary-foreground">
-                      FC
-                    </span>
-                    FirstCall
-                  </div>
-                  {["Home", "Metrics", "Results", "Calls", "Overview"].map((item) => (
-                    <div
-                      key={item}
-                      className={`mb-1 rounded-md px-2 py-1.5 text-sm ${
-                        item === "Calls"
-                          ? "bg-accent font-medium text-accent-foreground"
-                          : "text-muted-foreground"
-                      }`}
-                    >
-                      {item}
+              <h1 className="text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl">
+                FirstCall
+              </h1>
+              <p className="mt-5 text-lg text-muted-foreground md:text-xl">
+                {AGENT_NAME} answers +1 (385) 363-4730, screens callers, and logs every tool call.
+                Qualifies the lead, checks the statute of limitations, and books the consult — so your
+                firm only talks to cases worth taking.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+                <Button asChild size="lg">
+                  <Link to="/signin">Open dashboard</Link>
+                </Button>
+              </div>
+              <p className="mt-6 text-sm text-muted-foreground">
+                No credit card required · Live in under 10 minutes · Trusted by 200+ PI firms
+              </p>
+            </div>
+
+            <div className="w-full lg:max-w-none">
+              <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
+                <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-4 py-3">
+                  <span className="size-3 rounded-full bg-[#ff5f57]" />
+                  <span className="size-3 rounded-full bg-[#febc2e]" />
+                  <span className="size-3 rounded-full bg-[#28c840]" />
+                </div>
+                <div className="grid md:grid-cols-[180px_1fr]">
+                  <aside className="hidden border-r border-border bg-muted/30 p-4 md:block">
+                    <div className="mb-4 flex items-center gap-2 text-sm font-semibold">
+                      <LogoMark className="size-6 rounded-sm" />
+                      <span className="lowercase">firstcall</span>
                     </div>
-                  ))}
-                </aside>
-                <div className="p-5">
-                  <div className="mb-4 grid gap-3 sm:grid-cols-3">
-                    {[
-                      { label: "Calls today", value: "23" },
-                      { label: "Qualified", value: "14", accent: true },
-                      { label: "After-hours", value: "11" },
-                    ].map(({ label, value, accent }) => (
-                      <div key={label} className="rounded-lg border border-border p-3">
-                        <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                          {label}
-                        </div>
-                        <div
-                          className={`mt-1 text-2xl font-bold tracking-tight ${
-                            accent ? "text-primary" : ""
-                          }`}
-                        >
-                          {value}
-                        </div>
+                    {["Home", "Metrics", "Results", "Calls", "Overview"].map((item) => (
+                      <div
+                        key={item}
+                        className={`mb-1 rounded-md px-2 py-1.5 text-sm ${
+                          item === "Calls"
+                            ? "bg-accent font-medium text-accent-foreground"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        {item}
                       </div>
                     ))}
-                  </div>
-                  <div className="overflow-hidden rounded-lg border border-border">
-                    <div className="grid grid-cols-[1.3fr_1fr_1fr_0.7fr] gap-2 border-b border-border bg-muted/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                      <span>Caller</span>
-                      <span>Case type</span>
-                      <span>Disposition</span>
-                      <span>Score</span>
-                    </div>
-                    {MOCK_ROWS.map((row) => (
-                      <div
-                        key={row.caller}
-                        className="grid grid-cols-[1.3fr_1fr_1fr_0.7fr] gap-2 border-b border-border px-3 py-2.5 text-sm last:border-b-0"
-                      >
-                        <span className="truncate">{row.caller}</span>
-                        <span className="text-muted-foreground">{row.type}</span>
-                        <span>
-                          <span
-                            className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                              row.ok
-                                ? "bg-emerald-100 text-emerald-800"
-                                : "bg-red-100 text-red-800"
+                  </aside>
+                  <div className="p-4 sm:p-5">
+                    <div className="mb-4 grid gap-3 sm:grid-cols-3">
+                      {[
+                        { label: "Calls today", value: "23" },
+                        { label: "Qualified", value: "14", accent: true },
+                        { label: "After-hours", value: "11" },
+                      ].map(({ label, value, accent }) => (
+                        <div key={label} className="rounded-lg border border-border p-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            {label}
+                          </div>
+                          <div
+                            className={`mt-1 text-2xl font-bold tracking-tight ${
+                              accent ? "text-primary" : ""
                             }`}
                           >
-                            {row.disposition}
-                          </span>
-                        </span>
-                        <span>{row.score}</span>
+                            {value}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="overflow-hidden rounded-lg border border-border">
+                      <div className="grid grid-cols-[1.3fr_1fr_1fr_0.7fr] gap-2 border-b border-border bg-muted/40 px-3 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        <span>Caller</span>
+                        <span>Case type</span>
+                        <span>Disposition</span>
+                        <span>Score</span>
                       </div>
-                    ))}
+                      {MOCK_ROWS.map((row) => (
+                        <div
+                          key={row.caller}
+                          className="grid grid-cols-[1.3fr_1fr_1fr_0.7fr] gap-2 border-b border-border px-3 py-2.5 text-sm last:border-b-0"
+                        >
+                          <span className="truncate">{row.caller}</span>
+                          <span className="text-muted-foreground">{row.type}</span>
+                          <span>
+                            <span
+                              className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                                row.ok
+                                  ? "bg-emerald-100 text-emerald-800"
+                                  : "bg-red-100 text-red-800"
+                              }`}
+                            >
+                              {row.disposition}
+                            </span>
+                          </span>
+                          <span>{row.score}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>

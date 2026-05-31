@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 
-/** Black square mark — scales + signal (header / sidebar). */
+/** Black square mark — scales + signal. */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <img
@@ -12,7 +12,7 @@ export function LogoMark({ className }: { className?: string }) {
   )
 }
 
-/** Compact wordmark for nav bars and auth screens. */
+/** Nav bar: header icon + firstcall / Law AI wordmark. */
 export function Wordmark({
   className,
   showTagline = false,
@@ -35,13 +35,13 @@ export function Wordmark({
   )
 }
 
-/** Full stacked logo for marketing hero and footer. */
+/** Full stacked logo (F + firstcall + LAW AI) — marketing only when needed. */
 export function BrandLogoFull({ className }: { className?: string }) {
   return (
     <img
       src="/brand/firstcall-logo-full.png"
       alt="FirstCall Law AI"
-      className={cn("mx-auto h-auto w-full max-w-[220px] md:max-w-[260px]", className)}
+      className={cn("h-auto w-full max-w-[220px] md:max-w-[260px]", className)}
     />
   )
 }
