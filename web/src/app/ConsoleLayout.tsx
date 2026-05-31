@@ -1,4 +1,4 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom"
+import { NavLink, Outlet, useNavigate, Link } from "react-router-dom"
 import {
   LayoutDashboard,
   PhoneCall,
@@ -19,7 +19,7 @@ const NAV = [
 ]
 
 export default function ConsoleLayout() {
-  const { firmName, email, signOut } = useAuth()
+  const { firmName, email, authed, signOut } = useAuth()
   const navigate = useNavigate()
 
   async function handleSignOut() {
@@ -83,17 +83,23 @@ export default function ConsoleLayout() {
             Agent online · 24/7
           </div>
           <div className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5">
-            <span className="truncate text-xs text-muted-foreground">
-              {email}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleSignOut}
-              title="Sign out"
-            >
-              <LogOut className="size-4" />
-            </Button>
+            {authed ? (
+              <>
+                <span className="truncate text-xs text-muted-foreground">{email}</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleSignOut}
+                  title="Sign out"
+                >
+                  <LogOut className="size-4" />
+                </Button>
+              </>
+            ) : (
+              <Button asChild variant="outline" size="sm" className="w-full">
+                <Link to="/signin">Sign in</Link>
+              </Button>
+            )}
           </div>
         </div>
       </aside>
