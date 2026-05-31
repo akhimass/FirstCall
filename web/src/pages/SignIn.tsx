@@ -1,50 +1,38 @@
-import { useEffect, useState } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { useState } from "react"
+import { useNavigate } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import AuthLayout from "@/pages/AuthLayout"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useAuth } from "@/auth/AuthProvider"
+import { FIRM_NAME } from "@/lib/mock"
 
 export default function SignIn() {
-  const { signIn, signInDemo, authed } = useAuth()
+  const { signIn } = useAuth()
   const navigate = useNavigate()
   const [login, setLogin] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [goLive, setGoLive] = useState(false)
-
-  useEffect(() => {
-    if (goLive && authed) {
-      navigate("/app/live", { replace: true })
-    }
-  }, [goLive, authed, navigate])
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
     setLoading(true)
-    const { error: signInError } = await signIn(login.trim(), password)
+    const { error } = await signIn(login.trim(), password)
     setLoading(false)
-    if (signInError) {
-      setError(signInError)
+    if (error) {
+      setError(error)
       return
     }
-    setGoLive(true)
-  }
-
-  function onDemo() {
-    setError(null)
-    signInDemo(login.trim() || undefined)
-    setGoLive(true)
+    navigate("/app/overview", { replace: true })
   }
 
   return (
     <AuthLayout
-      title="FirstCall"
-      subtitle="Sign in to review live intake calls and tool telemetry."
+      title="Sign in"
+      subtitle={`${FIRM_NAME} team members only.`}
     >
       <form onSubmit={onSubmit} className="space-y-4">
         <div className="space-y-2">
@@ -67,30 +55,15 @@ export default function SignIn() {
             autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
+            required
           />
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
-        <Button type="submit" className="w-full" disabled={loading || goLive}>
+        <Button type="submit" className="w-full" disabled={loading}>
           {loading && <Loader2 className="animate-spin" />}
           Sign in
         </Button>
       </form>
-      <div className="mt-4 space-y-3">
-        <Button
-          type="button"
-          variant="outline"
-          className="w-full"
-          disabled={goLive}
-          onClick={onDemo}
-        >
-          Open demo dashboard
-        </Button>
-        <p className="text-center text-xs text-muted-foreground">
-          <Link to="/app/live" className="underline-offset-4 hover:underline">
-            Skip sign-in · view live dashboard
-          </Link>
-        </p>
-      </div>
     </AuthLayout>
   )
 }

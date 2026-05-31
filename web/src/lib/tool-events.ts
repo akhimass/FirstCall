@@ -133,10 +133,7 @@ export async function fetchToolEvents(opts?: {
   if (dbEvents.length > 0) {
     return { events: dbEvents, live: true }
   }
-  if (!isSupabaseConfigured && !isToolEventsApiConfigured) {
-    return { events: DEMO_EVENTS, live: false }
-  }
-  return { events: [], live: isSupabaseConfigured || isToolEventsApiConfigured }
+  return { events: DEMO_EVENTS, live: false }
 }
 
 function mergeToolEvents(events: ToolEvent[]): ToolEvent[] {

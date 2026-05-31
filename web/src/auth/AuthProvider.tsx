@@ -29,7 +29,6 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 const DEMO_KEY = "firstcall.demo.session"
-const BOOT_TIMEOUT_MS = 4000
 
 interface DemoSession {
   email: string
@@ -67,78 +66,51 @@ async function loadFirmName(userId: string, fallback: string | null): Promise<st
   }
 }
 
+function applyDemoSession(
+  demo: DemoSession,
+  setEmail: (v: string) => void,
+  setFirmName: (v: string) => void,
+  setUsingDemoSession: (v: boolean) => void
+) {
+  setUsingDemoSession(true)
+  setEmail(demo.email)
+  setFirmName(demo.firmName)
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [ready, setReady] = useState(false)
   const [email, setEmail] = useState<string | null>(null)
   const [firmName, setFirmName] = useState<string | null>(null)
   const [usingDemoSession, setUsingDemoSession] = useState(false)
 
   useEffect(() => {
     let active = true
+    const demo = readDemo()
+    if (demo) applyDemoSession(demo, setEmail, setFirmName, setUsingDemoSession)
 
-    const timeout = window.setTimeout(() => {
-      if (active) setReady(true)
-    }, BOOT_TIMEOUT_MS)
-
-    async function boot() {
-      const demo = readDemo()
-
-      try {
-        if (!isSupabaseConfigured || !supabase) {
-          if (demo) {
-            setEmail(demo.email)
-            setFirmName(demo.firmName)
-            setUsingDemoSession(true)
-          }
-          return
-        }
-
-        const { data } = await supabase.auth.getSession()
-        if (!active) return
-
-        const u = data.session?.user
-        if (u) {
-          const fallback =
-            (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
-          setUsingDemoSession(false)
-          setEmail(u.email ?? null)
-          setFirmName(fallback)
-          void loadFirmName(u.id, fallback).then((name) => {
-            if (active && name) setFirmName(name)
-          })
-        } else if (demo) {
-          setUsingDemoSession(true)
-          setEmail(demo.email)
-          setFirmName(demo.firmName)
-        }
-      } catch {
-        if (demo) {
-          setUsingDemoSession(true)
-          setEmail(demo.email)
-          setFirmName(demo.firmName)
-        }
-      } finally {
-        if (active) setReady(true)
-      }
+    if (!isSupabaseConfigured || !supabase) return () => {
+      active = false
     }
 
-    void boot()
+    void supabase.auth.getSession().then(({ data }) => {
+      if (!active) return
+      const u = data.session?.user
+      if (!u) return
+      clearDemo()
+      setUsingDemoSession(false)
+      const fallback = (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
+      setEmail(u.email ?? null)
+      setFirmName(fallback)
+      void loadFirmName(u.id, fallback).then((name) => {
+        if (active && name) setFirmName(name)
+      })
+    })
 
-    if (!isSupabaseConfigured || !supabase) {
-      return () => {
-        active = false
-        window.clearTimeout(timeout)
-      }
-    }
-
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user
       if (!u) {
-        const demo = readDemo()
-        if (demo) {
-          setUsingDemoSession(true)
-          setEmail(demo.email)
-          setFirmName(demo.firmName)
+        const stored = readDemo()
+        if (stored) {
+          applyDemoSession(stored, setEmail, setFirmName, setUsingDemoSession)
           return
         }
         setEmail(null)
@@ -148,8 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       clearDemo()
       setUsingDemoSession(false)
-      setEmail(u.email ?? null)
       const fallback = (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
+      setEmail(u.email ?? null)
       setFirmName(fallback)
       void loadFirmName(u.id, fallback).then((name) => {
         if (active && name) setFirmName(name)
@@ -158,7 +130,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       active = false
-      window.clearTimeout(timeout)
       sub.subscription.unsubscribe()
     }
   }, [])
@@ -169,9 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       firmName: FIRM_NAME,
     }
     writeDemo(session)
-    setUsingDemoSession(true)
-    setEmail(session.email)
-    setFirmName(session.firmName)
+    applyDemoSession(session, setEmail, setFirmName, setUsingDemoSession)
   }
 
   async function signUp(a: SignUpArgs) {
@@ -232,7 +201,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   return (
     <AuthContext.Provider
       value={{
-        ready,
+        ready: true,
         authed: Boolean(email),
         email,
         firmName,
