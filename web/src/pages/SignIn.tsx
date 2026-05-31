@@ -1,5 +1,5 @@
 import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import AuthLayout from "@/pages/AuthLayout"
 import { Button } from "@/components/ui/button"
@@ -63,6 +63,12 @@ export default function SignIn() {
           {loading && <Loader2 className="animate-spin" />}
           Sign in
         </Button>
+        <p className="text-center text-sm text-muted-foreground">
+          New firm?{" "}
+          <Link to="/signup" className="font-medium text-primary hover:underline">
+            Create your workspace
+          </Link>
+        </p>
       </form>
     </AuthLayout>
   )
