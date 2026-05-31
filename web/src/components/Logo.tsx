@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils"
 
-/** Black square mark — white scales + signal line art. */
+/** Black rounded-square mark — white F + scales. */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <img

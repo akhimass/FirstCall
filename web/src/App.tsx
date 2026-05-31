@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from "react-router-dom"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/auth/AuthProvider"
 import Landing from "@/pages/Landing"
+import Features from "@/pages/Features"
+import HowItWorks from "@/pages/HowItWorks"
+import Pricing from "@/pages/Pricing"
 import SignIn from "@/pages/SignIn"
 import SignUp from "@/pages/SignUp"
 import ConsoleLayout from "@/app/ConsoleLayout"
@@ -41,6 +44,9 @@ export default function App() {
     <AuthBoot>
       <Routes>
         <Route path="/" element={<Landing />} />
+        <Route path="/features" element={<Features />} />
+        <Route path="/how-it-works" element={<HowItWorks />} />
+        <Route path="/pricing" element={<Pricing />} />
         <Route
           path="/signin"
           element={

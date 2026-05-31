@@ -1,0 +1,38 @@
+import { cn } from "@/lib/utils"
+
+const PARTNERS = [
+  { name: "Cekura", src: "/backed-by/cekura.svg", className: "h-5 sm:h-6" },
+  { name: "Daily", src: "/backed-by/daily.svg", className: "h-4 sm:h-5" },
+  { name: "NVIDIA", src: "/backed-by/nvidia.svg", className: "h-5 sm:h-6" },
+  { name: "AWS", src: "/backed-by/aws.svg", className: "h-6 sm:h-7" },
+  { name: "Twilio", src: "/backed-by/twilio.svg", className: "h-5 sm:h-6" },
+] as const
+
+export function BackedBy({ className }: { className?: string }) {
+  return (
+    <div
+      className={cn(
+        "flex flex-col items-center gap-5 sm:flex-row sm:justify-center sm:gap-8",
+        className,
+      )}
+    >
+      <p className="shrink-0 text-xs font-semibold uppercase tracking-[0.28em] text-muted-foreground">
+        Backed by
+      </p>
+      <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 sm:gap-x-10">
+        {PARTNERS.map(({ name, src, className: logoClass }) => (
+          <li key={name}>
+            <img
+              src={src}
+              alt={name}
+              className={cn(
+                "w-auto opacity-55 grayscale transition-opacity hover:opacity-80",
+                logoClass,
+              )}
+            />
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
