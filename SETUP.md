@@ -93,7 +93,7 @@ From `server/`:
 
 ```bash
 export TOOL_EVENTS_API_TOKEN='your-secret-token'
-uv run uvicorn tool_events_api:app --host 0.0.0.0 --port 8001
+uv run python -m uvicorn tool_events_api:app --host 0.0.0.0 --port 8001
 ```
 
 The API stores events in SQLite. By default the database lives at:
