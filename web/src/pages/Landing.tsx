@@ -92,7 +92,7 @@ export default function Landing() {
           <div className="mx-auto max-w-3xl text-center">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-sm text-muted-foreground">
               <span className="size-2 rounded-full bg-emerald-500" />
-              Now answering in English &amp; Spanish · 24/7
+              Now answering in 25+ languages · 24/7
             </div>
             <h1 className="text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl">
               FirstCall

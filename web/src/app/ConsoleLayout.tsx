@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   PhoneCall,
   Radio,
+  FlaskConical,
   LogOut,
   Circle,
 } from "lucide-react"
@@ -16,6 +17,7 @@ const NAV = [
   { to: "/app/overview", label: "Overview", icon: LayoutDashboard },
   { to: "/app/calls", label: "Calls", icon: PhoneCall },
   { to: "/app/live", label: "Live", icon: Radio },
+  { to: "/app/cekura", label: "Cekura", icon: FlaskConical },
 ]
 
 export default function ConsoleLayout() {

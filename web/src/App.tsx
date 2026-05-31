@@ -6,6 +6,7 @@ import ConsoleLayout from "@/app/ConsoleLayout"
 import Overview from "@/app/Overview"
 import Calls from "@/app/Calls"
 import Live from "@/app/Live"
+import Cekura from "@/app/Cekura"
 import type { ReactNode } from "react"
 
 function Protected({ children }: { children: ReactNode }) {
@@ -45,6 +46,7 @@ export default function App() {
         >
           <Route path="overview" element={<Overview />} />
           <Route path="calls" element={<Calls />} />
+          <Route path="cekura" element={<Cekura />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
