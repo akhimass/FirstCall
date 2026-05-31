@@ -34,24 +34,32 @@ By the time the call ends, the firm has a complete intake record, a qualificatio
 3. Deployment on Pipecat Cloud — The bot is containerized via a Dockerfile based on dailyco/pipecat-base and deployed as flower-bot on Pipecat Cloud, with min_agents=1 to keep a warm instance ready. All secrets (NVIDIA_API_KEY, NEMOTRON_LLM_URL, CEKURA_API_KEY, etc.) are injected via Pipecat Cloud's secret sets, and the Cekura observability upload plus eval loop trigger automatically on every call hangup.
 
 ## 4. What We Built During the Hackathon
-**Pre-existing:** [What existed before the hackathon]
+We started with the NVIDIA stack. Getting the all-NVIDIA audio pipeline working — Parakeet STT → Nemotron-3-Super → Magpie TTS — took most of the morning. Parakeet silently returned empty transcripts until we traced it to a sample rate mismatch: Twilio sends 8 kHz, Parakeet needs 16 kHz, nothing in the docs flags this. We wrote a resampling stage inside the Pipecat pipeline to bridge it. We also discovered that Parakeet emits cumulative transcripts since connection open rather than per-turn deltas, so we wrote a token-count deduplication layer to give Pipecat clean per-turn text. Once the audio path was solid, we added the custom VLLMOpenAILLMService wrapper to fix TTFB reporting for Nemotron's thinking mode — stock Pipecat was clocking ~270ms when the real time-to-first-spoken-word was ~2.2s, an 8× underreport that would have made Cekura's latency scores meaningless.
 
-**Built during the hackathon:**
-- [Feature / component 1]
-- [Feature / component 2]
-- [Feature / component 3]
+With the NVIDIA pipeline stable, we built the Pipecat function-tool layer: four tools the LLM calls mid-conversation (check_sol, classify_treatment, route_case, end_call), backed by an AWS Bedrock RAG for statute-of-limitations lookups and a Supabase + S3 post-call write pipeline. The system prompt grew to ~645 lines covering a 6-stage intake flow, emotional state detection, distressed-caller handling, multilingual routing, and a completeness tracker that bridges back for any missing field before close.
+
+Cekura went in last and changed how we iterated. We wired Cekura Observability into the post-call hangup handler so every real Twilio call was automatically scored against three metrics: did Aria ask what happened, ask about medical attention, and ask about prior representation. The first scored live call showed Aria passing on "what happened" but failing the other two — she empathized with a distressed caller but didn't follow through on the required questions. Rather than patching the prompt manually, we built eval_loop.py: it polls Cekura scores after every call, and on any failure injects targeted REMINDER blocks into master_prompt.md automatically. The loop then optionally syncs the updated prompt to the Cekura agent description for the next deploy.
 
 ## 5. Tool Feedback
 
 ### Nemotron Feedback
-- **What worked well:** [...]
-- **What could be improved:** [...]
+**What worked well**: Nemotron-3-Super-120B handled nuanced PI intake conversations — emotional callers, ambiguous facts, statute-of-limitations jurisdictional edge cases — better than expected for a completely untuned model. The reasoning capability (thinking mode) was the decisive factor: non-reasoning models we tested tended to over-qualify callers rather than catch the subtle cases that make the difference between a qualified lead and wasted attorney time. Magpie TTS was low-latency and natural-sounding. The vLLM endpoint was stable all day with no timeouts or errors.
+**What could be improved**:
+- The 8 kHz → 16 kHz gap is the single biggest integration tax in this stack. Twilio delivers 8 kHz µ-law; Parakeet expects 16 kHz linear PCM. There is no automatic resampling, no format negotiation, and no explicit error — Parakeet silently returns empty transcripts. We spent a significant portion of the morning chasing ghost bugs before tracing it to sample rate. We had to write a resampling stage inside the Pipecat pipeline ourselves. This should be handled transparently at the NIM layer, or at minimum produce an actionable error like "received 8 kHz, expected 16 kHz" — silent empty transcripts on audio format mismatch is a silent killer for any telephony integration.
 
 ### Cekura Feedback
-- **What worked well:** [...]
-- **What could be improved:** [...]
-- **Bugs found:** [...]
+**What worked well**: Once correctly wired, the Twilio → Observability → metric scores pipeline was fast and reliable. Scoring real calls automatically and feeding failures directly into prompt patches without manual review is the strongest part of the platform. The MCP + Claude Code integration (/cekura-report) was a real productivity win — driving test runs from the terminal without switching to a browser kept the iteration loop tight.
+**What could be improved**:
+- Credential setup produces misleading errors. The platform requires keys from multiple systems; misconfiguring one produces errors that look like Cekura platform bugs rather than config issues. Clearer labeling of which key goes where plus validation feedback would cut setup time significantly.
+- Testing → Results and Observability → Calls serve different purposes but this isn't obvious upfront. We spent time confused about why scores weren't appearing where we expected them. A single reference doc explaining where results live depending on how the call was initiated would help.
+- WebRTC simulation and live telephony are not equivalent and the dashboard doesn't tell you why. Simulated runs consistently showed the agent as completely silent while the same agent handled live Twilio calls fine. The issue was infrastructure — not the prompt — but nothing in the dashboard surfaced that distinction. "Agent didn't speak" and "agent spoke but gave wrong answers" need to be separate diagnostic states.
+- Deploy latency breaks the iteration loop. When the workflow is deploy → score → patch → redeploy, ambiguity about whether the latest version is actually live becomes a real bottleneck. A clear "currently live: commit X" indicator in the dashboard would help close the loop.
+
+**Bugs found**: The Observability API requires transcript roles to be exactly "Testing Agent" / "Main Agent" — a wrong value returns an opaque error with no indication of which field failed. The ingestion docs also contain a sample payload with an invalid field value that returns a 400 with no explanation.
 
 ### Pipecat Feedback (optional)
-- **What worked well:** [...]
-- **What could be improved:** [...]
+**What worked well**: The pipeline abstraction (Pipeline, PipelineWorker, LLMContext, LLMContextAggregatorPair) made it straightforward to compose STT → LLM → TTS with function calling, VAD, and interruption handling as modular, swappable pieces. Deploying to Pipecat Cloud via pcc-deploy.toml with min_agents=1 was simple and fast.
+**What could be improved:**
+- Krisp VIVA wasn't enough on its own for telephony. Krisp is doing real work — without it, background noise was tripping VAD constantly — but on a live phone line it couldn't fully isolate the caller's voice from line noise and room echo. We had to layer Krisp with raised VAD thresholds (VAD_CONFIDENCE=0.7, VAD_MIN_VOLUME=0.55) and increased VAD_START_SECS to suppress false triggers. Even then, the combination felt like a workaround rather than a clean solution. Tighter Krisp integration tuned specifically for telephony audio profiles (not just conferencing) would help significantly.
+- FilterIncompleteUserTurnStrategies breaks on noisy phone lines. LLM-gated turn detection stalled completely — background noise fragmented transcripts so the LLM kept returning incomplete markers and the bot never replied. This was the "agent goes silent" bug. VAD-silence-based turn detection should be the default for telephony paths, not an opt-in.
+- Detected language from STT doesn't flow downstream to TTS. For multilingual pipelines, Magpie needs a language pin (MAGPIE_LANGUAGE) rather than being able to follow what Parakeet detected. Auto-propagating the STT's detected language to TTS would make multilingual support genuinely seamless.
