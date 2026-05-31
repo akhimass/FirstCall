@@ -5,6 +5,11 @@ name: Deploy Web to Vercel
 # pushes automatically — you can disable or delete this workflow.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-web.yml"
   workflow_dispatch:
 
 concurrency:
@@ -15,8 +20,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+      VERCEL_ORG_ID: team_4aP0zGgwfcWsbVFqmBSTZ7SY
+      VERCEL_PROJECT_ID: prj_R0duOQlulhksnG5FZlXnv0j5zG4R
     defaults:
       run:
         working-directory: web
