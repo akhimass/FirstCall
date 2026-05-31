@@ -77,3 +77,14 @@ Cekura went in last and changed how we iterated. We wired Cekura Observability i
 After sign-in, use **Overview**, **Calls**, **Live** (tool telemetry), and **Cekura** (eval scores) in the sidebar.
 
 For local setup (Tool Events API, Pipecat secrets, Supabase), see [SETUP.md](./SETUP.md).
+
+## Future Considerations
+
+### Firm-Level Phone Configuration
+Each firm will be able to provision and configure their own dedicated intake line in under two clicks — no engineering involvement, no Twilio console. Once set, that number maps to a persistent, always-on call agent that activates exclusively during the firm's off-hours: evenings, weekends, and holidays. Every inbound case is treated with equal priority regardless of when the call arrives, ensuring no lead is deprioritized simply because the office was closed.
+
+### Fine-Tuned Nemotron for Medical Intake
+The current Aria deployment runs on an untuned Nemotron-3-Super-120B base. The next milestone is a domain-adapted fine-tune on curated personal injury intake and medical triage corpora — producing a model that delivers not just fast responses, but clinically grounded ones. This means accurately characterizing injury severity, correctly interpreting treatment histories, and asking the follow-up questions that matter most to qualifying a case, without hallucinating medical facts or over-qualifying borderline callers.
+
+### Outbound Clinical Coordination
+In catastrophic or time-sensitive cases, Aria will be able to initiate outbound calls to nearby clinical institutions on the caller's behalf — scheduling urgent appointments, confirming ER capacity, or connecting the caller directly to a care coordinator. Rather than simply logging a severe classification and waiting for attorney follow-up, the agent takes immediate action at the moment it's most needed.
