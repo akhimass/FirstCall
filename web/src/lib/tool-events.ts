@@ -40,6 +40,8 @@ async function fetchFromApi(limit = 24, sessionId?: string): Promise<ToolEvent[]
     try {
       const res = await fetch(url, { headers })
       if (!res.ok) continue
+      const contentType = res.headers.get("content-type") ?? ""
+      if (!contentType.includes("application/json")) continue
       const payload = (await res.json()) as unknown
       if (!Array.isArray(payload)) continue
       return payload.map((row) => ({

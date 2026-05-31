@@ -29,6 +29,7 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 const DEMO_KEY = "firstcall.demo.session"
+const BOOT_TIMEOUT_MS = 4000
 
 interface DemoSession {
   email: string
@@ -54,12 +55,16 @@ function clearDemo() {
 
 async function loadFirmName(userId: string, fallback: string | null): Promise<string | null> {
   if (!supabase) return fallback
-  const { data } = await supabase
-    .from("profiles")
-    .select("firm_name")
-    .eq("id", userId)
-    .maybeSingle()
-  return data?.firm_name ?? fallback
+  try {
+    const { data } = await supabase
+      .from("profiles")
+      .select("firm_name")
+      .eq("id", userId)
+      .maybeSingle()
+    return data?.firm_name ?? fallback
+  } catch {
+    return fallback
+  }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -71,44 +76,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let active = true
 
+    const timeout = window.setTimeout(() => {
+      if (active) setReady(true)
+    }, BOOT_TIMEOUT_MS)
+
     async function boot() {
       const demo = readDemo()
 
-      if (!isSupabaseConfigured || !supabase) {
-        if (demo) {
+      try {
+        if (!isSupabaseConfigured || !supabase) {
+          if (demo) {
+            setEmail(demo.email)
+            setFirmName(demo.firmName)
+            setUsingDemoSession(true)
+          }
+          return
+        }
+
+        const { data } = await supabase.auth.getSession()
+        if (!active) return
+
+        const u = data.session?.user
+        if (u) {
+          const fallback =
+            (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
+          setUsingDemoSession(false)
+          setEmail(u.email ?? null)
+          setFirmName(fallback)
+          void loadFirmName(u.id, fallback).then((name) => {
+            if (active && name) setFirmName(name)
+          })
+        } else if (demo) {
+          setUsingDemoSession(true)
           setEmail(demo.email)
           setFirmName(demo.firmName)
-          setUsingDemoSession(true)
         }
+      } catch {
+        if (demo) {
+          setUsingDemoSession(true)
+          setEmail(demo.email)
+          setFirmName(demo.firmName)
+        }
+      } finally {
         if (active) setReady(true)
-        return
       }
-
-      const { data } = await supabase.auth.getSession()
-      if (!active) return
-
-      const u = data.session?.user
-      if (u) {
-        setUsingDemoSession(false)
-        setEmail(u.email ?? null)
-        setFirmName(
-          await loadFirmName(
-            u.id,
-            (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
-          )
-        )
-      } else if (demo) {
-        setUsingDemoSession(true)
-        setEmail(demo.email)
-        setFirmName(demo.firmName)
-      }
-
-      setReady(true)
     }
 
     void boot()
 
-    if (!isSupabaseConfigured || !supabase) return
+    if (!isSupabaseConfigured || !supabase) {
+      return () => {
+        active = false
+        window.clearTimeout(timeout)
+      }
+    }
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_e, session) => {
       const u = session?.user
@@ -128,16 +149,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearDemo()
       setUsingDemoSession(false)
       setEmail(u.email ?? null)
-      setFirmName(
-        await loadFirmName(
-          u.id,
-          (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
-        )
-      )
+      const fallback = (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
+      setFirmName(fallback)
+      void loadFirmName(u.id, fallback).then((name) => {
+        if (active && name) setFirmName(name)
+      })
     })
 
     return () => {
       active = false
+      window.clearTimeout(timeout)
       sub.subscription.unsubscribe()
     }
   }, [])
@@ -189,12 +210,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearDemo()
       setUsingDemoSession(false)
       setEmail(u.email ?? login.trim())
-      setFirmName(
-        await loadFirmName(
-          u.id,
-          (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
-        )
-      )
+      const fallback = (u.user_metadata?.firm_name as string | undefined) ?? FIRM_NAME
+      setFirmName(fallback)
+      void loadFirmName(u.id, fallback).then((name) => {
+        if (name) setFirmName(name)
+      })
     }
     return {}
   }
