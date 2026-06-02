@@ -20,12 +20,10 @@ export function BackedBy({ className }: { className?: string }) {
         className,
       )}
     >
-      <p className="flex max-w-[18rem] shrink-0 flex-wrap items-center justify-center gap-x-1.5 gap-y-1.5 text-center sm:max-w-none sm:justify-start sm:text-left">
+      <p className="flex max-w-none shrink-0 flex-wrap items-center justify-center gap-x-1.5 gap-y-1.5 text-center sm:justify-start sm:text-left">
         <span className={LABEL_CLASS}>Built at</span>
-        <span className="inline-flex items-center text-[10px] sm:text-xs">
-          <YCombinatorWordmark className="h-[18px] sm:h-5" />
-          <span className={cn(LABEL_CLASS, "ml-[0.5em]")}>Voice Agents Hackathon with</span>
-        </span>
+        <YCombinatorWordmark />
+        <span className={cn(LABEL_CLASS, "pl-[1ch]")}>Voice Agents Hackathon with</span>
       </p>
       <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 sm:gap-x-10">
         {PARTNERS.map(({ name, src, className: logoClass }) => (
