@@ -5,7 +5,6 @@ import { BackedBy } from "@/components/BackedBy"
 import { LogoMark } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
 import { FEATURES, STATS } from "@/lib/marketing"
-import { AGENT_NAME } from "@/lib/mock"
 
 const MOCK_ROWS = [
   { caller: "Caller · (570) 332-2862", type: "Auto accident", disposition: "Qualified", score: "92", ok: true },
@@ -18,20 +17,20 @@ const MOCK_ROWS = [
 export default function Landing() {
   return (
     <MarketingLayout>
-      <section className="mx-auto max-w-6xl px-6 pb-16 pt-12 md:pt-20">
-        <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
+      <section className="mx-auto max-w-6xl px-6 pb-6 pt-8 md:pt-10">
+        <div className="grid items-center gap-6 lg:grid-cols-2 lg:gap-8">
           <div className="text-center lg:text-left">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-sm text-muted-foreground">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-muted/50 px-3 py-1 text-sm text-muted-foreground">
               <span className="size-2 rounded-full bg-emerald-500" />
               Now answering in 25+ languages · 24/7
             </div>
             <h1 className="text-4xl font-semibold tracking-tight md:text-5xl lg:text-6xl">FirstCall</h1>
-            <p className="mt-5 text-lg text-muted-foreground md:text-xl">
-              {AGENT_NAME} answers +1 (385) 363-4730, screens callers, and logs every tool call.
-              Qualifies the lead, checks the statute of limitations, and books the consult — so your firm
+            <p className="mt-4 text-lg text-muted-foreground md:text-xl">
+              Every firm gets its own AI receptionist. Aria answers your dedicated line 24/7, screens
+              callers, qualifies leads economically and lawfully, and books the consult — so your firm
               only talks to cases worth taking.
             </p>
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
               <Button asChild size="lg">
                 <Link to="/signup">Start free trial</Link>
               </Button>
@@ -39,9 +38,6 @@ export default function Landing() {
                 <Link to="/how-it-works">See how it works</Link>
               </Button>
             </div>
-            <p className="mt-6 text-sm text-muted-foreground">
-              No credit card required · Live in under 10 minutes · Plans from $299/mo
-            </p>
           </div>
 
           <div className="w-full lg:max-w-none">
@@ -126,7 +122,7 @@ export default function Landing() {
       </section>
 
       <section className="border-y border-border bg-muted/20">
-        <div className="mx-auto grid max-w-6xl gap-8 px-6 py-14 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mx-auto grid max-w-6xl gap-6 px-6 py-8 sm:grid-cols-2 lg:grid-cols-4">
           {STATS.map(({ value, label }) => (
             <div key={label}>
               <div className="text-3xl font-bold tracking-tight md:text-4xl">{value}</div>
@@ -136,11 +132,11 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="border-b border-border px-6 py-10">
+      <section className="border-b border-border px-6 py-6">
         <BackedBy className="mx-auto max-w-6xl" />
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-20">
+      <section className="mx-auto max-w-6xl px-6 py-12">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-widest text-primary">Features</p>
@@ -155,7 +151,7 @@ export default function Landing() {
             </Link>
           </Button>
         </div>
-        <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {FEATURES.slice(0, 3).map(({ icon: Icon, title, body }) => (
             <div key={title} className="rounded-xl border border-border bg-card p-6">
               <div className="mb-4 inline-flex size-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
@@ -173,7 +169,7 @@ export default function Landing() {
         </div>
       </section>
 
-      <section className="border-y border-border bg-muted/20 px-6 py-16">
+      <section className="border-y border-border bg-muted/20 px-6 py-10">
         <blockquote className="mx-auto max-w-3xl text-center">
           <p className="text-xl font-medium leading-relaxed md:text-2xl">
             &ldquo;FirstCall booked four signed cases in its first weekend — calls we would have lost to
@@ -186,8 +182,8 @@ export default function Landing() {
         </blockquote>
       </section>
 
-      <section className="mx-auto max-w-6xl px-6 py-20">
-        <div className="rounded-2xl border border-border bg-card px-6 py-14 text-center shadow-sm md:px-12">
+      <section className="mx-auto max-w-6xl px-6 py-12">
+        <div className="rounded-2xl border border-border bg-card px-6 py-10 text-center shadow-sm md:px-12">
           <h2 className="text-3xl font-semibold tracking-tight md:text-4xl">
             Stop losing cases to voicemail.
           </h2>
