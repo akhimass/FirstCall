@@ -1,19 +1,38 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase"
+import { isDemoUser } from "@/lib/demo"
 import { MOCK_CALLS } from "@/lib/mock"
 import type { Call, CallKpis } from "@/lib/types"
 
 const SELECT_COLS =
   "id, session_id, caller_name, caller_phone, firm_phone, caller_email, case_type, state, decision, urgency, severity_tier, red_flags, sol_viable, sol_days_remaining, emotional_state, attorney_tier, appointment_slot, has_prior_representation, transcript, call_ended_reason, started_at, ended_at"
 
+function mergeWithMockCalls(live: Call[]): Call[] {
+  const seen = new Set(live.map((c) => c.id))
+  const extras = MOCK_CALLS.filter((c) => !seen.has(c.id))
+  return [...live, ...extras].sort(
+    (a, b) => new Date(b.ended_at).getTime() - new Date(a.ended_at).getTime(),
+  )
+}
+
 export async function fetchCalls(): Promise<{ calls: Call[]; live: boolean }> {
+  const demo = await isDemoUser()
+
   if (!isSupabaseConfigured || !supabase) {
     return { calls: MOCK_CALLS, live: false }
   }
+
   const { data, error } = await supabase
     .from("calls")
     .select(SELECT_COLS)
     .order("ended_at", { ascending: false })
     .limit(200)
+
+  if (demo) {
+    if (error || !data?.length) {
+      return { calls: MOCK_CALLS, live: false }
+    }
+    return { calls: mergeWithMockCalls(data as unknown as Call[]), live: true }
+  }
 
   if (error) {
     return { calls: [], live: false }

@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from "@/lib/supabase"
+import { isDemoUser } from "@/lib/demo"
 import type { ToolEvent } from "@/lib/types"
 
 const API_URL = import.meta.env.VITE_TOOL_EVENTS_API_URL as string | undefined
@@ -134,6 +135,9 @@ export async function fetchToolEvents(opts?: {
   }
   if (dbEvents.length > 0) {
     return { events: dbEvents, live: true }
+  }
+  if (await isDemoUser()) {
+    return { events: DEMO_EVENTS, live: false }
   }
   if (isSupabaseConfigured || isToolEventsApiConfigured) {
     return { events: [], live: true }
