@@ -4,7 +4,7 @@ import MarketingLayout from "@/components/MarketingLayout"
 import { BackedBy } from "@/components/BackedBy"
 import { LogoMark } from "@/components/Logo"
 import { Button } from "@/components/ui/button"
-import { FEATURES, STATS } from "@/lib/marketing"
+import { FEATURES, STATS, PRODUCTION_PRICING_NOTE } from "@/lib/marketing"
 
 const MOCK_ROWS = [
   {
@@ -250,14 +250,14 @@ export default function Landing() {
             Stop losing cases to voicemail.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-            Starter from $299/mo · Growth $799/mo · 14-day free trial on every plan.
+            {PRODUCTION_PRICING_NOTE}
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button asChild size="lg">
-              <Link to="/signup?plan=growth">Start free trial</Link>
+              <Link to="/signup">Create your workspace</Link>
             </Button>
             <Button asChild variant="outline" size="lg">
-              <Link to="/pricing">View pricing</Link>
+              <Link to="/how-it-works">See how it works</Link>
             </Button>
           </div>
         </div>

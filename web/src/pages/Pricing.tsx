@@ -7,6 +7,7 @@ import {
   PRICING_COMPARISON,
   PRICING_FAQ,
   PRICING_PLANS,
+  PRODUCTION_PRICING_NOTE,
   planSignupHref,
 } from "@/lib/marketing"
 
@@ -29,8 +30,7 @@ export default function Pricing() {
           Pay for intake that qualifies — not voicemail.
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-lg text-muted-foreground">
-          All plans include a 14-day free trial with full Growth features. No credit card required.
-          Month-to-month, or save two months with annual billing.
+          {PRODUCTION_PRICING_NOTE}
         </p>
       </section>
 
@@ -171,12 +171,16 @@ export default function Pricing() {
             Stop losing cases to voicemail.
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-            Most PI firms recover the cost of Growth in one signed case. Start your trial today — live
-            before your next missed call.
+            {PRODUCTION_PRICING_NOTE}
           </p>
-          <Button asChild size="lg" className="mt-8">
-            <Link to="/signup?plan=growth">Start 14-day free trial →</Link>
-          </Button>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+            <Button asChild size="lg">
+              <Link to="/signup">Create your workspace</Link>
+            </Button>
+            <Button asChild variant="outline" size="lg">
+              <Link to="/how-it-works">See how it works</Link>
+            </Button>
+          </div>
         </div>
       </section>
     </MarketingLayout>

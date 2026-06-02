@@ -111,7 +111,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     annualPrice: 249,
     description: "After-hours intake for solo and small PI practices.",
     bestFor: "1–2 attorneys · under 100 calls/mo",
-    cta: "Start free trial",
+    cta: "Get started",
     includes: [
       "1 dedicated intake line",
       "100 intake calls / month included",
@@ -132,7 +132,7 @@ export const PRICING_PLANS: PricingPlan[] = [
     description: "Full-time AI intake for growing plaintiff firms.",
     bestFor: "3–15 attorneys · 100–400 calls/mo",
     featured: true,
-    cta: "Start free trial",
+    cta: "Get started",
     includes: [
       "2 intake lines (after-hours + overflow)",
       "400 intake calls / month included",
@@ -211,3 +211,7 @@ export const STATS = [
 export function planSignupHref(planId: PricingPlanId): string {
   return planId === "firm" ? "/signup?plan=firm" : `/signup?plan=${planId}`
 }
+
+/** Shown on pricing + landing — hackathon preview, production will be paid subscriptions. */
+export const PRODUCTION_PRICING_NOTE =
+  "When we go live in production, these will be our subscription prices. For now, create a firm workspace and try FirstCall at no cost."
