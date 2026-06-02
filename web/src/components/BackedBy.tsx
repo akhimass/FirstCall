@@ -1,4 +1,8 @@
 import { cn } from "@/lib/utils"
+import { YCombinatorWordmark } from "@/components/YCombinatorWordmark"
+
+const LABEL_CLASS =
+  "text-[10px] font-semibold uppercase leading-snug tracking-[0.18em] text-muted-foreground sm:text-xs sm:tracking-[0.22em]"
 
 const PARTNERS = [
   { name: "Cekura", src: "/backed-by/cekura.svg", className: "h-5 sm:h-6" },
@@ -16,8 +20,10 @@ export function BackedBy({ className }: { className?: string }) {
         className,
       )}
     >
-      <p className="max-w-[14rem] shrink-0 text-center text-[10px] font-semibold uppercase leading-snug tracking-[0.18em] text-muted-foreground sm:max-w-none sm:text-left sm:text-xs sm:tracking-[0.22em]">
-        Built at YC Voice Agents Hackathon with
+      <p className="flex max-w-[18rem] shrink-0 flex-wrap items-center justify-center gap-x-2 gap-y-1.5 text-center sm:max-w-none sm:justify-start sm:text-left">
+        <span className={LABEL_CLASS}>Built at</span>
+        <YCombinatorWordmark className="h-[18px] w-auto text-foreground/70 sm:h-5" />
+        <span className={LABEL_CLASS}>Voice Agents Hackathon with</span>
       </p>
       <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-4 sm:gap-x-10">
         {PARTNERS.map(({ name, src, className: logoClass }) => (
